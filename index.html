@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube Play/Pause Cycle â€” v20 (single-video)</title>
+<style>
+  :root { --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a; --accent:#3b82f6; --danger:#ef4444; --shadow:0 10px 30px rgba(0,0,0,.25); }
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans";}
+  .wrap{max-width:900px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px}
+  h1{font-size:22px;margin:0 0 8px}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+  input[type="text"],input[type="number"]{width:100%;padding:14px 16px;border-radius:12px;border:1px solid #2a2d33;background:#0f1115;color:var(--fg);outline:none;font-size:18px}
+  button{padding:12px 16px;border-radius:12px;border:0;background:#2f3540;color:#fff;font-weight:700;cursor:pointer;font-size:16px}
+  button.primary{background:var(--accent)}
+  .status{font-size:14px;color:var(--muted)}
+  .playerWrap{position:relative}
+  iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:12px;background:#000}
+  .pauseCoverPlayer{display:none;position:absolute;inset:0;border-radius:12px;background:rgba(0,0,0,.8);pointer-events:none;z-index:20000}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .hint{font-size:12px;color:#9aa3ad}
+  .switch{position:relative;display:inline-block;width:56px;height:32px;vertical-align:middle}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#3a3f47;border-radius:999px;transition:.2s}
+  .slider:before{position:absolute;content:"";height:24px;width:24px;left:4px;top:4px;background:#fff;border-radius:50%;transition:.2s}
+  input:checked + .slider{background:#16a34a}
+  input:checked + .slider:before{transform:translateX(24px)}
+  .topControls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .banner{padding:10px 12px;border-radius:12px;background:#2a2d33;color:#e5e7eb;font-size:13px}
+  .banner.danger{background:#3b1111;color:#fee2e2;border:1px solid #7f1d1d}
+  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+</style>
+</head>
+<body>
+<div class="wrap" id="appRoot">
+  <div id="fileBanner" class="banner danger" style="display:none">
+    Running from <span class="mono">file://</span>. Chrome can block the YouTube IFrame API here and cause â€œError 153 / configuration mistakeâ€.
+    Please serve this file from a local server (e.g., <span class="mono">python -m http.server</span>) or any http(s) URL.
+  </div>
+
+  <div class="card">
+    <h1>â–¶ï¸ YouTube Play/Pause Cycle â€” v20</h1>
+    <div class="playerWrap" id="playerWrap">
+      <div id="player"></div>
+      <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
+    </div>
+    <div class="topControls">
+      <div class="status" id="status" style="flex:1">Loading YouTubeâ€¦</div>
+      <button id="playBtn" class="primary" disabled>Play</button>
+      <button id="pauseBtn" disabled>Pause</button>
+    </div>
+    <div id="errorBox" class="banner danger" style="display:none;margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <div class="grid-2">
+      <div>
+        <label>Play time (mm:ss)</label>
+        <div class="row" style="gap:12px">
+          <input id="playMin" type="number" min="0" step="1" value="0" placeholder="minutes" title="Minutes">
+          <span style="opacity:.65">:</span>
+          <input id="playSec" type="number" min="0" step="1" value="10" placeholder="seconds" title="Seconds">
+        </div>
+      </div>
+      <div>
+        <label>Pause time (mm:ss)</label>
+        <div class="row" style="gap:12px">
+          <input id="pauseMin" type="number" min="0" step="1" value="0" placeholder="minutes" title="Minutes">
+          <span style="opacity:.65">:</span>
+          <input id="pauseSec" type="number" min="0" step="1" value="5" placeholder="seconds" title="Seconds">
+        </div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:16px">
+      <label style="margin:0">Dim player on pause</label>
+      <label class="switch"><input id="dimToggle" type="checkbox"><span class="slider"></span></label>
+      <span class="hint">Default off. When on, the player darkens during pauses.</span>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <input id="videoInput" type="text" placeholder="Paste a YouTube URL or 11-char ID (single videos only)">
+      <button id="loadBtn" class="primary">Load</button>
+      <button id="clearBtn">Reset</button>
+    </div>
+    <div class="hint">Space = Play. Pause/Break = Pause. Playlist URLs are rejected (no <code>list=</code> allowed).</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  if(location.protocol === 'file:'){
+    document.getElementById('fileBanner').style.display = 'block';
+  }
+})();
+
+// --- Helpers
+function parseVideoId(input){
+  input=(input||'').trim();
+  if(!input) return null;
+  // Reject playlist links (list= parameter)
+  try{
+    const u = new URL(input);
+    if (u.searchParams.has('list')) return null;
+    if (u.hostname.includes('youtube.com')){
+      return u.searchParams.get('v') || null;
+    }
+    if (u.hostname === 'youtu.be'){
+      const p = u.pathname.slice(1);
+      if (p && !u.searchParams.has('list')) return p;
+      return null;
+    }
+  }catch(e){
+    // Not a URL; maybe an ID
+  }
+  // 11-char ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
+  return null;
+}
+function normalize(minEl, secEl){
+  let m=parseInt(minEl.value||"0",10); if(isNaN(m)) m=0;
+  let s=parseInt(secEl.value||"0",10); if(isNaN(s)) s=0;
+  if (s>=60){ m+=Math.floor(s/60); s=s%60; }
+  if (s<0){ const b=Math.ceil(Math.abs(s)/60); m=Math.max(0,m-b); s=(s%60+60)%60; }
+  minEl.value=m; secEl.value=s;
+  return m*60+s;
+}
+function setFromSeconds(minEl, secEl, total){
+  total=Math.max(0,Math.floor(total||0));
+  const m=Math.floor(total/60), s=total%60; minEl.value=m; secEl.value=s;
+}
+function setStatus(msg){ document.getElementById('status').textContent=msg; }
+function showErr(msg){ const b=document.getElementById('errorBox'); b.innerHTML=msg; b.style.display='block'; }
+function clearErr(){ const b=document.getElementById('errorBox'); b.style.display='none'; b.innerHTML=''; }
+
+// Select-on-focus for time inputs
+['playMin','playSec','pauseMin','pauseSec'].forEach(id=>{
+  const el = document.getElementById(id);
+  el.addEventListener('focus', ()=>{ el.select(); });
+});
+
+// --- YouTube IFrame API
+let player, nowTicker=null, firstGestureTried=false;
+let ytReadyResolve; const ytReady=new Promise(res=>ytReadyResolve=res);
+window.onYouTubeIframeAPIReady=()=>ytReadyResolve();
+const tag=document.createElement('script'); tag.src="https://www.youtube.com/iframe_api"; document.head.appendChild(tag);
+
+const pauseCoverPlayer=document.getElementById('pauseCoverPlayer');
+const dimToggle=document.getElementById('dimToggle');
+
+function installAllowAttrs(){
+  // Add autoplay etc once iframe exists
+  const iframe = document.querySelector('#player iframe');
+  if(iframe){
+    iframe.setAttribute('allow',"autoplay; encrypted-media; picture-in-picture; fullscreen");
+    iframe.setAttribute('allowfullscreen','');
+  }
+}
+
+function onStateChange(e){
+  if (e.data===YT.PlayerState.PAUSED || e.data===YT.PlayerState.UNSTARTED){
+    if (dimToggle.checked) pauseCoverPlayer.style.display='block';
+  }
+  if (e.data===YT.PlayerState.PLAYING || e.data===YT.PlayerState.BUFFERING){
+    pauseCoverPlayer.style.display='none';
+    document.getElementById('pauseBtn').disabled=false;
+  }
+}
+
+function onError(e){
+  const code = e && typeof e.data!=='undefined' ? e.data : 'unknown';
+  console.warn('YT error', code);
+  let msg = "YouTube error: <b>"+code+"</b>. ";
+  if (code===150 || code===101 || code===153){
+    msg += "This video is restricted from playing in embedded players by the owner (or region/age restrictions). Try another video URL.";
+  } else if (code===5){
+    msg += "HTML5 player error. Reload the page or try a different browser.";
+  } else if (code===2){
+    msg += "Invalid parameter. Check the video URL/ID.";
+  } else if (code===100){
+    msg += "The video was removed or set to private.";
+  } else {
+    msg += "Unknown issue. Try reloading.";
+  }
+  showErr(msg);
+  setStatus('âš ï¸ Playback error '+code);
+}
+
+function ensurePlayer(id){
+  const origin = (location.origin && location.origin!=='null') ? location.origin : undefined;
+  if(!player){
+    player = new YT.Player('player',{
+      videoId: id||'',
+      playerVars:{
+        enablejsapi:1,
+        origin: origin,
+        rel:0,modestbranding:1,playsinline:1
+      },
+      events:{
+        onReady:()=>{
+          installAllowAttrs();
+          setStatus('Player ready');
+          document.getElementById('playBtn').disabled=false;
+          document.getElementById('pauseBtn').disabled=false;
+        },
+        onStateChange:onStateChange,
+        onError:onError
+      }
+    });
+    // In case iframe is created a tick later
+    const t=setInterval(()=>{ installAllowAttrs(); if(document.querySelector('#player iframe')) clearInterval(t); },50);
+  }else if(id){
+    clearErr();
+    player.loadVideoById(id);
+  }
+}
+
+// Durations getters
+function getPlaySec(){ return normalize(document.getElementById('playMin'),document.getElementById('playSec')) }
+function getPauseSec(){ return normalize(document.getElementById('pauseMin'),document.getElementById('pauseSec')) }
+
+// States
+let timers={p:null,q:null};
+let stepRunning=false;
+let resumeAt=0;
+let currentVideoId="njwwfKUKNGQ"; // default from user
+
+function clearTimers(){ if(timers.p){clearTimeout(timers.p)} if(timers.q){clearTimeout(timers.q)} timers={p:null,q:null}; }
+function stopAll(){ stepRunning=false; clearTimers(); setStatus('â¹ï¸ Stopped'); }
+
+async function gestureSafePlay(){
+  // Try normal play
+  try{
+    player.playVideo();
+  }catch(e){}
+  // Wait briefly to see if it goes to PLAYING
+  const ok = await new Promise(res=>{
+    let tries=0;
+    const iv=setInterval(()=>{
+      tries++;
+      const st=player.getPlayerState();
+      if (st===YT.PlayerState.PLAYING || st===YT.PlayerState.BUFFERING){ clearInterval(iv); res(true); }
+      if (tries>10){ clearInterval(iv); res(false); }
+    },80);
+  });
+  if (ok) return true;
+  // Fallback: mute then play (Chrome often allows autoplay when muted)
+  const wasMuted = player.isMuted && player.isMuted();
+  try{ player.mute(); }catch(e){}
+  try{ player.playVideo(); }catch(e){}
+  const ok2 = await new Promise(res=>{
+    let tries=0;
+    const iv=setInterval(()=>{
+      tries++;
+      const st=player.getPlayerState();
+      if (st===YT.PlayerState.PLAYING || st===YT.PlayerState.BUFFERING){ clearInterval(iv); res(true); }
+      if (tries>10){ clearInterval(iv); res(false); }
+    },80);
+  });
+  if (ok2 && !wasMuted){
+    // Unmute after a moment to avoid immediate policy block
+    setTimeout(()=>{ try{ player.unMute(); }catch(e){} }, 500);
+  }
+  return ok2;
+}
+
+// Play stepper (forward, resume from last pause point)
+async function startPlayStepper(){
+  if(!player){ return; }
+  clearErr();
+  stepRunning=true; clearTimers();
+  const playS=Math.max(1,getPlaySec());
+  const pauseS=Math.max(1,getPauseSec());
+  async function cyclePlay(){
+    if(!stepRunning) return;
+    try{
+      if(resumeAt>0){ player.seekTo(resumeAt,true); }
+    }catch(e){}
+    pauseCoverPlayer.style.display='none';
+    setStatus('â–¶ï¸ Play: '+playS+'s');
+    const ok = await gestureSafePlay();
+    if(!ok){
+      setStatus('âš ï¸ Chrome blocked autoplay â€” click Play again');
+      showErr("Chrome may have blocked playback. Click <b>Play</b> again (counts as a user gesture).");
+      stepRunning=false;
+      return;
+    }
+    timers.p=setTimeout(cyclePause, playS*1000);
+  }
+  function cyclePause(){
+    if(!stepRunning) return;
+    try{
+      resumeAt = player.getCurrentTime()||0;
+      player.pauseVideo();
+    }catch(e){}
+    if (dimToggle.checked) pauseCoverPlayer.style.display='block';
+    setStatus('â¸ï¸ Pause: '+pauseS+'s');
+    timers.q=setTimeout(cyclePlay, pauseS*1000);
+  }
+  cyclePlay();
+}
+function pauseNow(){
+  stopAll();
+  try{ player.pauseVideo(); }catch(e){}
+  if (dimToggle.checked) pauseCoverPlayer.style.display='block';
+  setStatus('â¸ï¸ Paused');
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown',(e)=>{
+  if(e.target && (/INPUT|TEXTAREA|SELECT/).test(e.target.tagName)) return;
+  if(e.key===' '){ startPlayStepper(); e.preventDefault();
+  }else if(e.key==='Pause'){ pauseNow(); e.preventDefault(); }
+}, true);
+
+// Load URL
+document.getElementById('loadBtn').addEventListener('click', async()=>{
+  await ytReady; ensurePlayer();
+  const raw = document.getElementById('videoInput').value.trim();
+  const id = parseVideoId(raw);
+  if(!id){ setStatus('âš ï¸ Invalid or playlist URL. Paste a single-video URL or ID.'); return; }
+  currentVideoId = id;
+  resumeAt = 0;
+  player.loadVideoById(id);
+  setStatus('Loaded');
+});
+
+// Reset
+document.getElementById('clearBtn').addEventListener('click',()=>{
+  stopAll();
+  setFromSeconds(document.getElementById('playMin'),document.getElementById('playSec'),10);
+  setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'),5);
+  dimToggle.checked=false;
+  pauseCoverPlayer.style.display='none';
+  clearErr();
+  setStatus('âŸ² Reset to defaults');
+});
+
+// Buttons
+document.getElementById('playBtn').addEventListener('click', startPlayStepper);
+document.getElementById('pauseBtn').addEventListener('click', pauseNow);
+
+// Init
+(async function init(){
+  setFromSeconds(document.getElementById('playMin'),document.getElementById('playSec'),10);
+  setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'),5);
+  await ytReady;
+  ensurePlayer("njwwfKUKNGQ"); // default single video
+  setStatus('Ready â€” default video loaded');
+})();
+</script>
+</body>
+</html>
