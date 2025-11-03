@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YouTube Play/Pause Cycle â€” v22</title>
+<title>YT3 - play pause cycle (v23)</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
@@ -21,7 +21,6 @@
   button{padding:10px 14px;border-radius:12px;border:0;background:var(--btn);color:#fff;font-weight:700;cursor:pointer;font-size:14px}
   button:hover{background:var(--btn-hover)}
   button.primary{background:var(--accent)}
-  .status{font-size:14px;color:var(--muted)}
   .playerWrap{position:relative}
   iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:12px;background:#000}
   .titleOverlay{position:absolute;left:12px;right:12px;bottom:12px;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);padding:8px 12px;border-radius:10px;font-weight:600}
@@ -36,14 +35,9 @@
   input:checked + .slider{background:#16a34a}
   input:checked + .slider:before{transform:translateX(24px)}
   .topControls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
-  .banner{padding:10px 12px;border-radius:12px;background:#2a2d33;color:#e5e7eb;font-size:13px}
-  .banner.danger{background:#3b1111;color:#fee2e2;border:1px solid #7f1d1d}
-  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace}
-  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-  .chip{padding:8px 10px;border-radius:999px;background:var(--chip);border:1px solid var(--chip-border);font-size:12px;cursor:pointer}
-  .chip:hover{filter:brightness(1.08)}
-  .btn-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--btn)}
-  .btn-icon svg{width:20px;height:20px}
+  .btn-icon{height:54px;min-width:54px;padding:0 18px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--btn)}
+  .btn-icon svg{width:24px;height:24px}
+  .btn-wide{min-width:120px}
   .btn-play{background:#616a78} /* grey when idle or paused */
   .btn-play.active{background:var(--accent)} /* active when running */
   .btn-pause{background:var(--btn)}
@@ -58,7 +52,12 @@
   .idx{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:#23262d;border-radius:8px;color:#cbd5e1;font-size:12px}
   .titleEditable{border:0;background:transparent;color:var(--fg);font-size:14px;padding:8px;border-radius:8px}
   .titleEditable:focus{outline:1px solid #3a3f47;background:#111319}
-  .small{font-size:12px;opacity:.7}
+  .banner{padding:10px 12px;border-radius:12px;background:#2a2d33;color:#e5e7eb;font-size:13px}
+  .banner.danger{background:#3b1111;color:#fee2e2;border:1px solid #7f1d1d}
+  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace}
+  /* Watermark */
+  .watermark{position:fixed;right:16px;top:16px;background:rgba(0,0,0,.65);padding:8px 12px;border-radius:10px;z-index:50;opacity:0;transition:opacity .4s}
+  .watermark.show{opacity:1}
 </style>
 </head>
 <body>
@@ -69,11 +68,11 @@
 
   <div class="tabs">
     <button id="tabPlayer" class="btn-tab active">Player</button>
-    <button id="tabUrls" class="btn-tab">URLs</button>
+    <button id="tabUrls" class="btn-tab">URL list</button>
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1>â–¶ï¸ YouTube Play/Pause Cycle â€” v22</h1>
+    <h1>YT3 - play pause cycle</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -81,17 +80,15 @@
     </div>
 
     <div class="topControls">
-      <div class="status" id="status" style="flex:1">Loading YouTubeâ€¦</div>
-
       <button id="prevBtn" title="Previous" class="btn-icon" aria-label="Previous">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"/></svg>
       </button>
 
-      <button id="playBtn" class="btn-icon btn-play" aria-pressed="false" aria-label="Play">
+      <button id="playBtn" class="btn-icon btn-wide btn-play" aria-pressed="false" aria-label="Play">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>
       </button>
 
-      <button id="pauseBtn" class="btn-icon btn-pause" aria-pressed="false" aria-label="Pause">
+      <button id="pauseBtn" class="btn-icon btn-wide btn-pause" aria-pressed="false" aria-label="Pause">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
       </button>
 
@@ -126,6 +123,8 @@
           <span class="hint">Dim on pause</span>
           <label class="switch" title="Play random items"><input id="randToggle" type="checkbox"><span class="slider"></span></label>
           <span class="hint">Random</span>
+          <label class="switch" title="Play full video, ignore timings"><input id="bypassToggle" type="checkbox"><span class="slider"></span></label>
+          <span class="hint">Bypass timings</span>
         </div>
       </div>
     </div>
@@ -149,16 +148,22 @@
         <button id="importBtn">Import JSON</button>
       </div>
     </div>
-    <div class="hint">Unlimited items. Titles auto-fetched; click a title to edit. Use â†‘ â†“ or â‡¡Top to reorder. Doubleâ€‘click title to play.</div>
+    <div class="hint">Unlimited items. Titles auto-fetched; click a title to edit. Use â†‘ â†“ or â‡¡Top to reorder. Double-click title to play.</div>
     <div class="list" id="list"></div>
   </div>
 </div>
+
+<div id="wm" class="watermark">Jimmy James - 04.11.2025</div>
 
 <script>
 (function(){
   if(location.protocol === 'file:'){
     document.getElementById('fileBanner').style.display = 'block';
   }
+  // Watermark show for 5s
+  const wm=document.getElementById('wm');
+  setTimeout(()=> wm.classList.add('show'), 80);
+  setTimeout(()=> wm.classList.remove('show'), 5000);
 })();
 
 const S_LIST='YT21_LIST';
@@ -208,7 +213,6 @@ function setFromSeconds(minEl, secEl, total){
   total=Math.max(0,Math.floor(total||0));
   const m=Math.floor(total/60), s=total%60; minEl.value=m; secEl.value=s;
 }
-function setStatus(msg){ document.getElementById('status').textContent=msg; }
 function showErr(msg){ const b=document.getElementById('errorBox'); b.innerHTML=msg; b.style.display='block'; }
 function clearErr(){ const b=document.getElementById('errorBox'); b.style.display='none'; b.innerHTML=''; }
 function selectOnFocus(el){ el.addEventListener('focus', ()=> el.select()); }
@@ -246,7 +250,7 @@ async function fetchTitleForId(id){
 }
 async function addItemByUrl(rawUrl){
   const id = parseVideoId(rawUrl);
-  if(!id){ setStatus('âš ï¸ Invalid URL (need a video link with v=)'); return; }
+  if(!id){ showErr('âš ï¸ Invalid URL (need a video link with v=)'); return; }
   const title = await fetchTitleForId(id);
   items.push({id, title});
   saveList();
@@ -279,7 +283,7 @@ function renderList(){
     row.className='item';
     const idxBox = document.createElement('div'); idxBox.className='idx'; idxBox.textContent = idx+1;
     const title = document.createElement('input'); title.className='titleEditable'; title.value = it.title || '(untitled video)';
-    title.title = 'Edit title. Doubleâ€‘click to play.';
+    title.title = 'Edit title. Double-click to play.';
     title.addEventListener('change', ()=> updateTitle(idx, title.value));
     title.addEventListener('dblclick', ()=>{ loadByIndex(idx, true); setTab('player'); });
     const btnUp = document.createElement('button'); btnUp.className='btn-icon'; btnUp.title='Move up';
@@ -298,41 +302,10 @@ function renderList(){
     list.appendChild(row);
   });
 }
-function exportJSON(){
-  const data = items.map(it=>({url:idToWatchUrl(it.id), title: it.title||''}));
-  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'yt_v22_list.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-function filterToIdList(arr){
-  const out=[];
-  for(const entry of arr){
-    const src = (entry && (entry.url||entry.href||entry.id||entry.source)) || '';
-    const id = parseVideoId(String(src||''));
-    if(id) out.push({id, title: (entry.title||'').trim() || ''});
-  }
-  return out;
-}
-function importJSONFile(file){
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    try{
-      const arr = JSON.parse(reader.result);
-      const cleaned = filterToIdList(arr);
-      if(cleaned.length===0){ setStatus('âš ï¸ No valid video URLs found'); return; }
-      items = cleaned.map(o=>({id:o.id,title:o.title}));
-      saveList(); renderList(); setStatus('Imported '+items.length+' items');
-    }catch(e){ setStatus('âš ï¸ Invalid JSON'); }
-  };
-  reader.readAsText(file);
-}
 
 // Presets
-function saveSettings(play,pause,dim,rand){
-  localStorage.setItem(S_SETTINGS, JSON.stringify({play,pause,dim,rand}));
+function saveSettings(play,pause,dim,rand,bypass){
+  localStorage.setItem(S_SETTINGS, JSON.stringify({play,pause,dim,rand,bypass}));
 }
 function loadSettings(){
   try{
@@ -342,6 +315,7 @@ function loadSettings(){
       setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'), j.pause||5);
       document.getElementById('dimToggle').checked = !!j.dim;
       document.getElementById('randToggle').checked = !!j.rand;
+      document.getElementById('bypassToggle').checked = !!j.bypass;
     }
   }catch(e){}
 }
@@ -365,7 +339,7 @@ function renderPresetChips(){
     chip.onclick = ()=>{
       setFromSeconds(document.getElementById('playMin'),document.getElementById('playSec'), p.play);
       setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'), p.pause);
-      saveSettings(p.play,p.pause, document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked);
+      saveSettings(p.play,p.pause, document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked, document.getElementById('bypassToggle').checked);
     };
     holder.appendChild(chip);
   });
@@ -380,6 +354,7 @@ const tag=document.createElement('script'); tag.src="https://www.youtube.com/ifr
 const pauseCoverPlayer=document.getElementById('pauseCoverPlayer');
 const dimToggle=document.getElementById('dimToggle');
 const randToggle=document.getElementById('randToggle');
+const bypassToggle=document.getElementById('bypassToggle');
 const titleOverlay=document.getElementById('titleOverlay');
 
 function installAllowAttrs(){
@@ -406,7 +381,7 @@ function onError(e){
   else if (code===5){ msg += "HTML5 player error. Reload the page or try a different browser."; }
   else if (code===2){ msg += "Invalid video parameter. Check the URL/ID."; }
   else if (code===100){ msg += "The video was removed or set to private."; }
-  showErr(msg); setStatus('âš ï¸ Playback error '+code);
+  showErr(msg);
 }
 function ensurePlayer(id){
   const origin = (location.origin && location.origin!=='null') ? location.origin : undefined;
@@ -414,7 +389,7 @@ function ensurePlayer(id){
     player = new YT.Player('player',{
       videoId: id||'',
       playerVars:{ enablejsapi:1, origin:origin, rel:0, modestbranding:1, playsinline:1 },
-      events:{ onReady:()=>{ installAllowAttrs(); setStatus('Player ready'); }, onStateChange:onStateChange, onError:onError }
+      events:{ onReady:()=>{ installAllowAttrs(); }, onStateChange:onStateChange, onError:onError }
     });
     const t=setInterval(()=>{ installAllowAttrs(); if(document.querySelector('#player iframe')) clearInterval(t); },50);
   }else if(id){
@@ -444,9 +419,6 @@ function waitForPlaying(maxTries){
   });
 }
 
-function getPlaySec(){ return normalize(document.getElementById('playMin'),document.getElementById('playSec')) }
-function getPauseSec(){ return normalize(document.getElementById('pauseMin'),document.getElementById('pauseSec')) }
-
 let timers={p:null,q:null};
 let stepRunning=false;
 let resumeAt=0;
@@ -462,24 +434,41 @@ function setPauseUIActive(on){
   btn.classList.toggle('active', !!on);
   btn.setAttribute('aria-pressed', on?'true':'false');
 }
+
+async function startPlay(){
+  if(!player) return;
+  clearErr();
+  stepRunning=false; // plain play
+  resumeAt=0;
+  setPlayUIActive(true);
+  setPauseUIActive(false);
+  const ok = await gestureSafePlay();
+  if(!ok){
+    showErr("Chrome may have blocked playback. Click <b>Play</b> again.");
+    setPlayUIActive(false);
+  }
+}
+
 async function startPlayStepper(){
+  if(bypassToggle.checked){
+    saveSettings(getPlaySec(), getPauseSec(), dimToggle.checked, randToggle.checked, true);
+    return startPlay();
+  }
   if(!player){ return; }
   clearErr();
   stepRunning=true; clearTimers();
   setPlayUIActive(true);
   const playS=Math.max(1,getPlaySec());
   const pauseS=Math.max(1,getPauseSec());
-  saveSettings(playS,pauseS, dimToggle.checked, randToggle.checked);
+  saveSettings(playS,pauseS, dimToggle.checked, randToggle.checked, false);
   pushPreset(playS,pauseS);
   async function cyclePlay(){
     if(!stepRunning) return;
     try{ if(resumeAt>0){ player.seekTo(resumeAt,true); } }catch(e){}
     pauseCoverPlayer.style.display='none';
     setPauseUIActive(false);
-    setStatus('â–¶ Play: '+fmtSec(playS));
     const ok = await gestureSafePlay();
     if(!ok){
-      setStatus('âš ï¸ Chrome blocked autoplay â€” click Play again');
       showErr("Chrome may have blocked playback. Click <b>Play</b> again.");
       stepRunning=false;
       setPlayUIActive(false);
@@ -492,7 +481,6 @@ async function startPlayStepper(){
     try{ resumeAt = player.getCurrentTime()||0; player.pauseVideo(); }catch(e){}
     if (dimToggle.checked) pauseCoverPlayer.style.display='block';
     setPauseUIActive(true);
-    setStatus('â™â™ Pause: '+fmtSec(pauseS));
     timers.q=setTimeout(()=>{
       if(randToggle.checked && items.length>0){
         let nxt = Math.floor(Math.random()*items.length);
@@ -511,8 +499,8 @@ function pauseNow(){
   if (dimToggle.checked) pauseCoverPlayer.style.display='block';
   setPauseUIActive(true);
   setPlayUIActive(false);
-  setStatus('â¸ Paused');
 }
+
 function loadByIndex(idx, startCycle){
   if(idx<0 || idx>=items.length) return;
   currentIndex = idx;
@@ -520,8 +508,6 @@ function loadByIndex(idx, startCycle){
   resumeAt=0;
   ensurePlayer(it.id);
   setTitleOverlay(it.title||idToWatchUrl(it.id));
-  setStatus('Loaded');
-  renderList();
   if(startCycle){ startPlayStepper(); }
 }
 function setTitleOverlay(text){
@@ -575,7 +561,7 @@ document.getElementById('importFile').addEventListener('change', (e)=>{
 });
 
 const SEED_URLS=[
-  "https://www.youtube.com/watch?v=njwwfKUKNGQ",
+  "https://www.youtube.com/watch?v=jiJ-wZch_vQ",
   "https://www.youtube.com/watch?v=4yv4ea1pFp4&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=3",
   "https://www.youtube.com/watch?v=pHqC1cV4tzQ&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=2",
   "https://www.youtube.com/watch?v=5oKW1UqWnmY&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=5",
@@ -594,15 +580,7 @@ const SEED_URLS=[
 (async function init(){
   await ytReady;
   // Times
-  try{
-    const j = JSON.parse(localStorage.getItem(S_SETTINGS)||'null');
-    if(j){
-      setFromSeconds(document.getElementById('playMin'),document.getElementById('playSec'), j.play||10);
-      setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'), j.pause||5);
-      document.getElementById('dimToggle').checked = !!j.dim;
-      document.getElementById('randToggle').checked = !!j.rand;
-    }
-  }catch(e){}
+  loadSettings();
   // List
   loadList();
   if(items.length===0){
@@ -611,15 +589,14 @@ const SEED_URLS=[
       if(id) items.push({id, title:'(loading...)'});
     }
     saveList();
-    items.forEach(async (it, i)=>{
+    items.forEach(async (it)=>{
       const t = await fetchTitleForId(it.id);
-      it.title = t; saveList(); if(i===currentIndex) setTitleOverlay(t); renderList();
+      it.title = t; saveList(); renderList();
     });
   }
   renderList();
-  ensurePlayer(items[0]?.id || "njwwfKUKNGQ");
+  ensurePlayer(items[0]?.id || "jiJ-wZch_vQ");
   document.getElementById('titleOverlay').textContent = items[0]?.title || 'â€”';
-  setStatus('Ready â€” default video loaded');
   // Presets
   renderPresetChips();
 })();
