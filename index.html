@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>YT play/pause â€” v34</title>
+<title>YT play/pause â€” v35</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
@@ -87,7 +87,7 @@
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause â€” v34</h1>
+    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause â€” v35</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -490,17 +490,20 @@ function onStateChange(e){
   }
 }
 function onError(e){ console.warn('YT error', e && e.data); }
-function ensurePlayer(id){
+let pendingLoad=null;
+function ensurePlayer(id, startSeconds){
   const origin = (location.origin && location.origin!=='null') ? location.origin : undefined;
   if(!player){
+    pendingLoad = {id, start: (typeof startSeconds==='number' ? Math.max(0,Math.floor(startSeconds)) : 0)};
     player = new YT.Player('player',{
       videoId: id||'',
       playerVars:{ enablejsapi:1, origin:origin, rel:0, modestbranding:1, playsinline:1 },
-      events:{ onReady:()=>{ installAllowAttrs(); }, onStateChange:onStateChange, onError:onError }
+      events:{ onReady:()=>{ installAllowAttrs(); if(pendingLoad){ try{ player.loadVideoById({videoId: pendingLoad.id, startSeconds: pendingLoad.start}); }catch(e){} pendingLoad=null; } }, onStateChange:onStateChange, onError:onError }
     });
     const t=setInterval(()=>{ installAllowAttrs(); if(document.querySelector('#player iframe')) clearInterval(t); },50);
   }else if(id){
-    player.loadVideoById(id);
+    const start = (typeof startSeconds==='number') ? Math.max(0,Math.floor(startSeconds)) : 0;
+    try{ player.loadVideoById({videoId: id, startSeconds: start}); }catch(e){ try{ player.loadVideoById(id); }catch(_){} }
   }
 }
 async function gestureSafePlay(){
@@ -611,7 +614,7 @@ function loadByIndex(idx, startCycle, resumeSeconds){
   const it=items[idx];
   if(typeof resumeSeconds==='number'){ resumeAt = Math.max(0, Math.floor(resumeSeconds)); }
   else { resumeAt = 0; }
-  ensurePlayer(it.id);
+  ensurePlayer(it.id, resumeAt, 0);
   renderList();
   if(startCycle){ startPlayStepper(); }
 }
@@ -734,7 +737,7 @@ function ensureSeedUrlsPresentAppend(){
     });
   }
   renderList();
-  ensurePlayer(items[0]?.id || "jiJ-wZch_vQ");
+  ensurePlayer(items[0]?.id || "jiJ-wZch_vQ", 0);
   // Presets
   renderPresetChips();
   // Try to go fullscreen shortly after load if pref is already on (mobile UX)
