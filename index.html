@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>YT play/pause â€” v33</title>
+<title>YT play/pause â€” v34</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
@@ -87,7 +87,7 @@
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause â€” v33</h1>
+    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause â€” v34</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -142,7 +142,7 @@
       </div>
       <div class="switchWrap">
         <div class="switchLabel">Rand.-last pos.</div>
-        <label class="switch" title="When Random is on, resume each video from its last paused position"><input id="randLastToggle" type="checkbox" checked><span class="slider"></span></label>
+        <label class="switch" title="When Random is on, resume each video from its last paused position"><input id="randLastToggle" type="checkbox"><span class="slider"></span></label>
       </div>
       <div class="switchWrap">
         <div class="switchLabel">Bypass timings</div>
@@ -401,7 +401,7 @@ function loadSettings(){
       setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'), j.pause??5);
       document.getElementById('dimToggle').checked = !!j.dim;
       document.getElementById('randToggle').checked = !!j.rand;
-      document.getElementById('randLastToggle').checked = (j.randLast!==false);
+      document.getElementById('randLastToggle').checked = !!j.randLast;
       document.getElementById('bypassToggle').checked = !!j.bypass;
       if(typeof j.fs==='boolean'){ document.getElementById('fsToggle').checked = j.fs; }
     }
