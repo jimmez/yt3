@@ -643,7 +643,8 @@ document.getElementById('fsToggle').addEventListener('change', (e)=>{
   if(e.target.checked){ requestFS(); } else { if(document.fullscreenElement){ document.exitFullscreen().catch(()=>{}); } }
 });
 
-// Seed URLs (first run only)
+
+// Seed URLs (always append on load; dedupe by id)
 const SEED_URLS=[
   "https://www.youtube.com/watch?v=jiJ-wZch_vQ",
   "https://www.youtube.com/watch?v=4yv4ea1pFp4&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=3",
@@ -660,6 +661,26 @@ const SEED_URLS=[
   "https://www.youtube.com/watch?v=WvpR4Ipmjj4&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=14",
   "https://www.youtube.com/watch?v=ISRmHPuuX5s&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=16"
 ];
+
+function ensureSeedUrlsPresent(){
+  const existing = new Set(items.map(it=>it.id));
+  const toAdd = [];
+  for(const u of SEED_URLS){
+    const id = parseVideoId(u);
+    if(id && !existing.has(id)){
+      toAdd.push({id, title:'(loading...)'});
+      existing.add(id);
+    }
+  }
+  if(toAdd.length){
+    items = items.concat(toAdd);
+    saveList();
+    toAdd.forEach(async (it)=>{
+      const t = await fetchTitleForId(it.id);
+      it.title = t; saveList(); renderList();
+    });
+  }
+}
 
 (async function init(){
   await ytReady;
