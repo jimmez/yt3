@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>YT play/pause - v39</title>
+<title>YT play/pause - v40</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
@@ -106,7 +106,7 @@
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause - v39</h1>
+    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause - v40</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -552,17 +552,38 @@ startTimerCountdown = function(){
     if (msLeft <= 0){
       clearTimer();
       timerExpired = true;
-      try{ player.pauseVideo(); }catch(e){}
+      try { pauseNow(); } catch(e) { try{ player.pauseVideo(); }catch(_){} }
+      try { setPlayUIActive(false); setPauseUIActive(false); } catch(e) {}
       applyPink(true, true);
       setTimeout(()=> applyPink(true, false), 10_000);
       updateTimerBadge(0);
-    }else{
+    } else {
       updateTimerBadge(msLeft);
     }
   }, 500);
 };
 
 // --- YouTube search via piped.video public API
+
+function addAndPlayById(id, titleHint){
+  const existingIdx = items.findIndex(it=>it.id===id);
+  (async ()=>{
+    if(existingIdx===-1){
+      const title = titleHint || await fetchTitleForId(id);
+      items.unshift({id, title});
+    }else if(existingIdx>0){
+      const [x]=items.splice(existingIdx,1);
+      items.unshift(x);
+    }
+    saveList(); renderList();
+    const nextResume = (randToggle.checked && document.getElementById('randLastToggle').checked) ? getLastPos(id) : 0;
+    currentIndex = 0;
+    ensurePlayer(id, nextResume);
+    setTab('player');
+    startPlayStepper();
+  })();
+}
+
 const searchInput = document.getElementById('searchInput');
 const searchBtn = document.getElementById('searchBtn');
 const searchStatus = document.getElementById('searchStatus');
@@ -586,32 +607,27 @@ async function doSearch(){
     }
     searchStatus.textContent = vids.length + ' results';
     vids.slice(0,40).forEach(v=>{
-      const card = document.createElement('div'); card.className='result';
+      const card = document.createElement('div'); card.className='result'; card.dataset.vid = v.videoId || '';
       const img = document.createElement('img');
       img.src = (v.thumbnail || (v.thumbnailUrl || '')).replace('hqdefault','mqdefault');
       img.alt = v.title||'';
+      img.style.cursor='pointer';
+      img.onclick = ()=> addAndPlayById(v.videoId, v.title);
       const meta = document.createElement('div'); meta.className='meta';
       const t = document.createElement('div'); t.className='t'; t.textContent = v.title || '(untitled)';
+      t.style.cursor='pointer';
+      t.onclick = ()=> addAndPlayById(v.videoId, v.title);
       const ch = document.createElement('div'); ch.className='ch'; ch.textContent = v.uploaderName || v.channel || '';
       const actsWrap = document.createElement('div'); actsWrap.className='actions';
+      card.style.cursor='pointer';
+      card.addEventListener('click', (ev)=>{
+        // avoid double-trigger when clicking the explicit button area
+        const path = ev.composedPath && ev.composedPath();
+        if(path && path.includes(actsWrap)) return;
+        addAndPlayById(v.videoId, v.title);
+      });
       const addPlay = document.createElement('button'); addPlay.className='btn-small'; addPlay.innerHTML='<span>Add & Play</span>';
-      addPlay.onclick = async ()=>{
-        const id = v.videoId;
-        const existingIdx = items.findIndex(it=>it.id===id);
-        if(existingIdx===-1){
-          const title = v.title || await fetchTitleForId(id);
-          items.unshift({id, title});
-        }else if(existingIdx>0){
-          const [x]=items.splice(existingIdx,1);
-          items.unshift(x);
-        }
-        saveList(); renderList();
-        const nextResume = (randToggle.checked && document.getElementById('randLastToggle').checked) ? getLastPos(id) : 0;
-        currentIndex = 0;
-        ensurePlayer(id, nextResume);
-        setTab('player');
-        startPlayStepper();
-      };
+      addPlay.onclick = ()=> addAndPlayById(v.videoId, v.title);
       actsWrap.appendChild(addPlay);
       card.appendChild(img);
       card.appendChild(meta);
