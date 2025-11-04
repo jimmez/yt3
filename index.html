@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YouTube Play/Pause Cycle â€” v22</title>
+<title>YouTube Play/Pause Cycle â€” v25</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
@@ -11,7 +11,7 @@
     --shadow:0 10px 30px rgba(0,0,0,.25);
     --btn:#2f3540; --btn-hover:#3b414d; --chip:#22262d; --chip-border:#2f3540;
   }
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans";}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans");}
   .wrap{max-width:1100px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:16px}
   .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px}
   h1{font-size:22px;margin:0 0 8px}
@@ -42,8 +42,9 @@
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .chip{padding:8px 10px;border-radius:999px;background:var(--chip);border:1px solid var(--chip-border);font-size:12px;cursor:pointer}
   .chip:hover{filter:brightness(1.08)}
-  .btn-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--btn)}
-  .btn-icon svg{width:20px;height:20px}
+  .btn-icon{height:54px;min-width:54px;padding:0 18px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--btn)}
+  .btn-icon svg{width:24px;height:24px}
+  .btn-wide{min-width:140px}
   .btn-play{background:#616a78} /* grey when idle or paused */
   .btn-play.active{background:var(--accent)} /* active when running */
   .btn-pause{background:var(--btn)}
@@ -59,6 +60,12 @@
   .titleEditable{border:0;background:transparent;color:var(--fg);font-size:14px;padding:8px;border-radius:8px}
   .titleEditable:focus{outline:1px solid #3a3f47;background:#111319}
   .small{font-size:12px;opacity:.7}
+  /* watermark */
+  .watermark{position:fixed;right:16px;top:16px;background:rgba(0,0,0,.65);padding:8px 12px;border-radius:10px;z-index:50;opacity:0;transition:opacity .4s}
+  .watermark.show{opacity:1}
+  /* labels above toggles */
+  .switchWrap{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+  .switchLabel{font-size:12px;color:#9aa3ad}
 </style>
 </head>
 <body>
@@ -69,11 +76,11 @@
 
   <div class="tabs">
     <button id="tabPlayer" class="btn-tab active">Player</button>
-    <button id="tabUrls" class="btn-tab">URLs</button>
+    <button id="tabUrls" class="btn-tab">URL list=</button>
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1>â–¶ï¸ YouTube Play/Pause Cycle â€” v22</h1>
+    <h1>YouTube Play/Pause Cycle â€” v25</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -87,11 +94,11 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"/></svg>
       </button>
 
-      <button id="playBtn" class="btn-icon btn-play" aria-pressed="false" aria-label="Play">
+      <button id="playBtn" class="btn-icon btn-wide btn-play" aria-pressed="false" aria-label="Play">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>
       </button>
 
-      <button id="pauseBtn" class="btn-icon btn-pause" aria-pressed="false" aria-label="Pause">
+      <button id="pauseBtn" class="btn-icon btn-wide btn-pause" aria-pressed="false" aria-label="Pause">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
       </button>
 
@@ -120,12 +127,19 @@
         </div>
       </div>
       <div>
-        <label style="margin-bottom:6px">Options</label>
-        <div class="row">
-          <label class="switch" title="Dim player on pause"><input id="dimToggle" type="checkbox"><span class="slider"></span></label>
-          <span class="hint">Dim on pause</span>
-          <label class="switch" title="Play random items"><input id="randToggle" type="checkbox"><span class="slider"></span></label>
-          <span class="hint">Random</span>
+        <div class="row" style="gap:24px">
+          <div class="switchWrap">
+            <div class="switchLabel">Dim on pause</div>
+            <label class="switch" title="Dim player on pause"><input id="dimToggle" type="checkbox"><span class="slider"></span></label>
+          </div>
+          <div class="switchWrap">
+            <div class="switchLabel">Random</div>
+            <label class="switch" title="Play random items"><input id="randToggle" type="checkbox"><span class="slider"></span></label>
+          </div>
+          <div class="switchWrap">
+            <div class="switchLabel">Bypass timings</div>
+            <label class="switch" title="Play full video, ignore timings"><input id="bypassToggle" type="checkbox"><span class="slider"></span></label>
+          </div>
         </div>
       </div>
     </div>
@@ -149,16 +163,22 @@
         <button id="importBtn">Import JSON</button>
       </div>
     </div>
-    <div class="hint">Unlimited items. Titles auto-fetched; click a title to edit. Use â†‘ â†“ or â‡¡Top to reorder. Doubleâ€‘click title to play.</div>
+    <div class="hint">Unlimited items. Titles auto-fetched; click a title to edit. Use â†‘ â†“ or â‡¡Top to reorder. Double-click title to play.</div>
     <div class="list" id="list"></div>
   </div>
 </div>
+
+<div id="wm" class="watermark">Jimmy James - 04.11.2025</div>
 
 <script>
 (function(){
   if(location.protocol === 'file:'){
     document.getElementById('fileBanner').style.display = 'block';
   }
+  // Watermark show for 5s
+  const wm=document.getElementById('wm');
+  setTimeout(()=> wm.classList.add('show'), 80);
+  setTimeout(()=> wm.classList.remove('show'), 5000);
 })();
 
 const S_LIST='YT21_LIST';
@@ -279,7 +299,7 @@ function renderList(){
     row.className='item';
     const idxBox = document.createElement('div'); idxBox.className='idx'; idxBox.textContent = idx+1;
     const title = document.createElement('input'); title.className='titleEditable'; title.value = it.title || '(untitled video)';
-    title.title = 'Edit title. Doubleâ€‘click to play.';
+    title.title = 'Edit title. Double-click to play.';
     title.addEventListener('change', ()=> updateTitle(idx, title.value));
     title.addEventListener('dblclick', ()=>{ loadByIndex(idx, true); setTab('player'); });
     const btnUp = document.createElement('button'); btnUp.className='btn-icon'; btnUp.title='Move up';
@@ -303,7 +323,7 @@ function exportJSON(){
   const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'yt_v22_list.json';
+  a.download = 'yt_v25_list.json';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -331,8 +351,8 @@ function importJSONFile(file){
 }
 
 // Presets
-function saveSettings(play,pause,dim,rand){
-  localStorage.setItem(S_SETTINGS, JSON.stringify({play,pause,dim,rand}));
+function saveSettings(play,pause,dim,rand,bypass){
+  localStorage.setItem(S_SETTINGS, JSON.stringify({play,pause,dim,rand,bypass}));
 }
 function loadSettings(){
   try{
@@ -342,6 +362,7 @@ function loadSettings(){
       setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'), j.pause||5);
       document.getElementById('dimToggle').checked = !!j.dim;
       document.getElementById('randToggle').checked = !!j.rand;
+      document.getElementById('bypassToggle').checked = !!j.bypass;
     }
   }catch(e){}
 }
@@ -365,7 +386,7 @@ function renderPresetChips(){
     chip.onclick = ()=>{
       setFromSeconds(document.getElementById('playMin'),document.getElementById('playSec'), p.play);
       setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'), p.pause);
-      saveSettings(p.play,p.pause, document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked);
+      saveSettings(p.play,p.pause, document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked, document.getElementById('bypassToggle').checked);
     };
     holder.appendChild(chip);
   });
@@ -380,6 +401,7 @@ const tag=document.createElement('script'); tag.src="https://www.youtube.com/ifr
 const pauseCoverPlayer=document.getElementById('pauseCoverPlayer');
 const dimToggle=document.getElementById('dimToggle');
 const randToggle=document.getElementById('randToggle');
+const bypassToggle=document.getElementById('bypassToggle');
 const titleOverlay=document.getElementById('titleOverlay');
 
 function installAllowAttrs(){
@@ -393,10 +415,12 @@ function onStateChange(e){
   if (e.data===YT.PlayerState.PAUSED || e.data===YT.PlayerState.UNSTARTED){
     if (dimToggle.checked) pauseCoverPlayer.style.display='block';
     setPauseUIActive(true);
+    setPlayUIActive(false); // ensure play button is grey during pause
   }
   if (e.data===YT.PlayerState.PLAYING || e.data===YT.PlayerState.BUFFERING){
     pauseCoverPlayer.style.display='none';
     setPauseUIActive(false);
+    setPlayUIActive(true);
   }
 }
 function onError(e){
@@ -462,24 +486,40 @@ function setPauseUIActive(on){
   btn.classList.toggle('active', !!on);
   btn.setAttribute('aria-pressed', on?'true':'false');
 }
+
+async function startPlainPlay(){
+  // Bypass timings: play full video continuously
+  stepRunning=false;
+  clearTimers();
+  setPauseUIActive(false);
+  setPlayUIActive(true);
+  const ok = await gestureSafePlay();
+  if(!ok){
+    showErr("Chrome may have blocked playback. Click <b>Play</b> again.");
+    setPlayUIActive(false);
+  }
+}
+
 async function startPlayStepper(){
   if(!player){ return; }
   clearErr();
+  if(document.getElementById('bypassToggle').checked){
+    saveSettings(getPlaySec(), getPauseSec(), document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked, true);
+    return startPlainPlay();
+  }
   stepRunning=true; clearTimers();
   setPlayUIActive(true);
   const playS=Math.max(1,getPlaySec());
   const pauseS=Math.max(1,getPauseSec());
-  saveSettings(playS,pauseS, dimToggle.checked, randToggle.checked);
+  saveSettings(playS,pauseS, document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked, false);
   pushPreset(playS,pauseS);
   async function cyclePlay(){
     if(!stepRunning) return;
     try{ if(resumeAt>0){ player.seekTo(resumeAt,true); } }catch(e){}
     pauseCoverPlayer.style.display='none';
     setPauseUIActive(false);
-    setStatus('â–¶ Play: '+fmtSec(playS));
     const ok = await gestureSafePlay();
     if(!ok){
-      setStatus('âš ï¸ Chrome blocked autoplay â€” click Play again');
       showErr("Chrome may have blocked playback. Click <b>Play</b> again.");
       stepRunning=false;
       setPlayUIActive(false);
@@ -492,7 +532,7 @@ async function startPlayStepper(){
     try{ resumeAt = player.getCurrentTime()||0; player.pauseVideo(); }catch(e){}
     if (dimToggle.checked) pauseCoverPlayer.style.display='block';
     setPauseUIActive(true);
-    setStatus('â™â™ Pause: '+fmtSec(pauseS));
+    setPlayUIActive(false); // ensure play turns grey during pause
     timers.q=setTimeout(()=>{
       if(randToggle.checked && items.length>0){
         let nxt = Math.floor(Math.random()*items.length);
@@ -508,9 +548,9 @@ function pauseNow(){
   stepRunning=false;
   clearTimers();
   try{ player.pauseVideo(); }catch(e){}
-  if (dimToggle.checked) pauseCoverPlayer.style.display='block';
+  if (document.getElementById('dimToggle').checked) pauseCoverPlayer.style.display='block';
   setPauseUIActive(true);
-  setPlayUIActive(false);
+  setPlayUIActive(false); // keep play grey
   setStatus('â¸ Paused');
 }
 function loadByIndex(idx, startCycle){
@@ -574,8 +614,9 @@ document.getElementById('importFile').addEventListener('change', (e)=>{
   e.target.value='';
 });
 
+// Seed URLs (first run)
 const SEED_URLS=[
-  "https://www.youtube.com/watch?v=njwwfKUKNGQ",
+  "https://www.youtube.com/watch?v=jiJ-wZch_vQ",
   "https://www.youtube.com/watch?v=4yv4ea1pFp4&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=3",
   "https://www.youtube.com/watch?v=pHqC1cV4tzQ&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=2",
   "https://www.youtube.com/watch?v=5oKW1UqWnmY&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=5",
@@ -594,15 +635,7 @@ const SEED_URLS=[
 (async function init(){
   await ytReady;
   // Times
-  try{
-    const j = JSON.parse(localStorage.getItem(S_SETTINGS)||'null');
-    if(j){
-      setFromSeconds(document.getElementById('playMin'),document.getElementById('playSec'), j.play||10);
-      setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'), j.pause||5);
-      document.getElementById('dimToggle').checked = !!j.dim;
-      document.getElementById('randToggle').checked = !!j.rand;
-    }
-  }catch(e){}
+  loadSettings();
   // List
   loadList();
   if(items.length===0){
@@ -617,7 +650,7 @@ const SEED_URLS=[
     });
   }
   renderList();
-  ensurePlayer(items[0]?.id || "njwwfKUKNGQ");
+  ensurePlayer(items[0]?.id || "jiJ-wZch_vQ");
   document.getElementById('titleOverlay').textContent = items[0]?.title || 'â€”';
   setStatus('Ready â€” default video loaded');
   // Presets
