@@ -2,41 +2,42 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YouTube Play/Pause Cycle â€” v26</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>YT play/pause â€” v27</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
-    --accent:#4f6dd1; /* softer blue */
-    --amber:#d6a85b;  /* softer amber */
+    --accent:#3e56a8; /* softer blue (subtle) */
+    --amber:#b89557;  /* not used much now */
     --shadow:0 10px 30px rgba(0,0,0,.25);
-    --btn:#2c323b; --btn-hover:#333a44; --chip:#22262d; --chip-border:#2f3540;
+    --btn:#2c323b; --btn-hover:#343a45; --chip:#22262d; --chip-border:#2f3540;
+    --btn-grey:#59616c;        /* idle grey for play */
+    --btn-pause:#4a515b;       /* subtle different grey for pause active */
   }
   html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans");}
   .wrap{max-width:1100px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:16px}
   .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px}
-  h1{font-size:22px;margin:0 0 8px}
+  h1{font-size:20px;margin:0 0 8px;color:#e2e8f0}
   h2{font-size:16px;margin:0 0 8px;color:#cbd5e1}
   label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
   input[type="text"],input[type="number"]{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #2a2d33;background:#0f1115;color:var(--fg);outline:none;font-size:16px}
-  button{padding:10px 14px;border-radius:12px;border:0;background:var(--btn);color:#fff;font-weight:700;cursor:pointer;font-size:14px}
+  button{padding:10px 14px;border-radius:12px;border:0;background:var(--btn);color:#fff;font-weight:700;cursor:pointer;font-size:14px;white-space:nowrap}
   button:hover{background:var(--btn-hover)}
   .playerWrap{position:relative}
   iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:12px;background:#000}
-  .titleOverlay{position:absolute;left:12px;right:12px;bottom:12px;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);padding:8px 12px;border-radius:10px;font-weight:600}
   .pauseCoverPlayer{display:none;position:absolute;inset:0;border-radius:12px;background:rgba(0,0,0,.8);pointer-events:none;z-index:10}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .chip{padding:8px 10px;border-radius:999px;background:var(--chip);border:1px solid var(--chip-border);font-size:12px;cursor:pointer;transition:filter .15s, box-shadow .15s, background .15s}
   .chip:hover{filter:brightness(1.08)}
-  .chip.active{box-shadow:0 0 0 2px var(--accent) inset;background:rgba(79,109,209,.18)}
+  .chip.active{box-shadow:0 0 0 2px var(--accent) inset;background:rgba(62,86,168,.18)}
   .btn-icon{height:54px;min-width:54px;padding:0 18px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--btn)}
   .btn-icon svg{width:24px;height:24px}
-  .btn-wide{min-width:150px}
-  .btn-play{background:#616a78} /* grey when idle or paused */
-  .btn-play.active{background:var(--accent); filter:saturate(.7) brightness(.95)} /* subtle blue when active */
+  .btn-wide{min-width:min(22vw,160px)} /* responsive to keep one row on mobile */
+  .btn-play{background:var(--btn-grey)} /* grey when idle or paused */
+  .btn-play.active{background:var(--accent); filter:saturate(.6) brightness(.92)} /* subtle blue when active */
   .btn-pause{background:var(--btn)}
-  .btn-pause.active{background:var(--amber); filter:saturate(.6) brightness(.95)} /* subtle amber on pause */
+  .btn-pause.active{background:var(--btn-pause)} /* subtle grey diff when paused */
   .btn-tab{background:transparent;border:1px solid #2f3540}
   .btn-tab.active{background:#1a1d23}
   .tabs{display:flex;gap:8px}
@@ -64,9 +65,14 @@
   .timeGroup{display:flex;align-items:center;gap:8px}
   .timeGroup label{margin:0}
   .timeGroup input[type="number"]{width:86px;text-align:right}
+  /* controls one line */
+  .topControls{display:flex;gap:10px;align-items:center;flex-wrap:nowrap;overflow-x:auto}
   /* watermark */
   .watermark{position:fixed;right:16px;top:16px;background:rgba(0,0,0,.65);padding:8px 12px;border-radius:10px;z-index:50;opacity:0;transition:opacity .4s}
   .watermark.show{opacity:1}
+  /* labeled small buttons on URL page */
+  .btn-small{display:inline-flex;align-items:center;gap:6px;padding:10px 12px;border-radius:10px}
+  .btn-small svg{width:18px;height:18px}
 </style>
 </head>
 <body>
@@ -81,15 +87,14 @@
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1>YouTube Play/Pause Cycle â€” v26</h1>
+    <h1>YT play/pause â€” v27</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
-      <div id="titleOverlay" class="titleOverlay">â€”</div>
     </div>
 
-    <div class="topControls row" style="justify-content:flex-end">
-      <button id="prevBtn" title="Previous" class="btn-icon" aria-label="Previous">
+    <div class="topControls" style="margin-top:12px">
+      <button id="prevBtn" title="Previous" class="btn-icon btn-wide" aria-label="Previous">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"/></svg>
       </button>
 
@@ -101,28 +106,11 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
       </button>
 
-      <button id="nextBtn" title="Next" class="btn-icon" aria-label="Next">
+      <button id="nextBtn" title="Next" class="btn-icon btn-wide" aria-label="Next">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"/></svg>
       </button>
-    </div>
 
-    <div id="errorBox" class="banner danger" style="display:none;margin-top:10px"></div>
-
-    <!-- Times in one line -->
-    <div class="timesWrap" style="margin-top:8px">
-      <div class="timeGroup">
-        <label for="playMin">Play (mm:ss)</label>
-        <input id="playMin" type="number" min="0" step="1" value="0" title="Play minutes">
-        <span style="opacity:.65">:</span>
-        <input id="playSec" type="number" min="0" step="1" value="10" title="Play seconds">
-      </div>
-      <div class="timeGroup">
-        <label for="pauseMin">Pause (mm:ss)</label>
-        <input id="pauseMin" type="number" min="0" step="1" value="0" title="Pause minutes">
-        <span style="opacity:.65">:</span>
-        <input id="pauseSec" type="number" min="0" step="1" value="5" title="Pause seconds">
-      </div>
-      <div class="row" style="gap:24px;margin-left:auto">
+      <div class="row" style="margin-left:auto;gap:14px">
         <div class="switchWrap">
           <div class="switchLabel">Dim on pause</div>
           <label class="switch" title="Dim player on pause"><input id="dimToggle" type="checkbox"><span class="slider"></span></label>
@@ -135,6 +123,26 @@
           <div class="switchLabel">Bypass timings</div>
           <label class="switch" title="Play full video, ignore timings"><input id="bypassToggle" type="checkbox"><span class="slider"></span></label>
         </div>
+        <div class="switchWrap">
+          <div class="switchLabel">Fullscreen</div>
+          <label class="switch" title="Open in fullscreen (mobile friendly)"><input id="fsToggle" type="checkbox" checked><span class="slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Times in one line -->
+    <div class="timesWrap" style="margin-top:10px">
+      <div class="timeGroup">
+        <label for="playMin">Play (mm:ss)</label>
+        <input id="playMin" type="number" min="0" step="1" value="0" title="Play minutes">
+        <span style="opacity:.65">:</span>
+        <input id="playSec" type="number" min="0" step="1" value="10" title="Play seconds">
+      </div>
+      <div class="timeGroup">
+        <label for="pauseMin">Pause (mm:ss)</label>
+        <input id="pauseMin" type="number" min="0" step="1" value="0" title="Pause minutes">
+        <span style="opacity:.65">:</span>
+        <input id="pauseSec" type="number" min="0" step="1" value="5" title="Pause seconds">
       </div>
     </div>
 
@@ -151,10 +159,19 @@
         <input id="urlInput" type="text" placeholder="Paste YouTube URL">
       </div>
       <div class="row" style="gap:8px;margin-top:22px">
-        <button id="addUrlBtn" class="btn-icon" title="Add">ï¼‹</button>
-        <button id="exportBtn" class="btn-icon" title="Export JSON">â¤“</button>
+        <button id="addUrlBtn" class="btn-small" title="Add URL">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 11V6h2v5h5v2h-5v5h-2v-5H6v-2h5z"/></svg>
+          <span>Add</span>
+        </button>
+        <button id="exportBtn" class="btn-small" title="Export list as JSON">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 20h14v-2H5v2zM12 2 6.5 7.5l1.4 1.4L11 5.8V16h2V5.8l3.1 3.1 1.4-1.4L12 2z"/></svg>
+          <span>Export</span>
+        </button>
         <input type="file" id="importFile" accept=".json,application/json" style="display:none">
-        <button id="importBtn" class="btn-icon" title="Import JSON">â¤’</button>
+        <button id="importBtn" class="btn-small" title="Import list from JSON">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9v10H5V9H3v12h18V9h-2zM11 16V5.8L8 8.9 6.6 7.5 12 2l5.4 5.5L16 8.9l-3-3.1V16h-2z"/></svg>
+          <span>Import</span>
+        </button>
       </div>
     </div>
     <div class="banner" style="margin-top:8px">Unlimited items. Titles auto-fetched; click a title to edit. Use â†‘ â†“ or â‡¡Top to reorder. Double-click title to play.</div>
@@ -178,6 +195,7 @@
 const S_LIST='YT21_LIST';
 const S_SETTINGS='YT21_SETTINGS';
 const S_PRESETS='YT21_PRESETS';
+const S_FULLSCREEN='YT21_FULLSCREEN';
 
 const tabPlayer=document.getElementById('tabPlayer');
 const tabUrls=document.getElementById('tabUrls');
@@ -230,6 +248,7 @@ function fmtSec(t){ t=Math.max(0,Math.floor(t||0)); const m=Math.floor(t/60), s=
 let items = []; // {id,title}
 let currentIndex = -1;
 
+// Persistence
 function saveList(){ localStorage.setItem(S_LIST, JSON.stringify(items)); }
 function loadList(){
   try{
@@ -305,7 +324,7 @@ function renderList(){
     btnPlay.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>';
     btnPlay.onclick=()=>{ loadByIndex(idx,true); setTab('player'); };
     row.appendChild(idxBox); row.appendChild(title); row.appendChild(btnUp); row.appendChild(btnDown); row.appendChild(btnTop); row.appendChild(btnPlay);
-    if(idx===currentIndex){ row.style.boxShadow='0 0 0 2px rgba(79,109,209,.5) inset'; }
+    if(idx===currentIndex){ row.style.boxShadow='0 0 0 2px rgba(62,86,168,.5) inset'; }
     list.appendChild(row);
   });
 }
@@ -314,7 +333,7 @@ function exportJSON(){
   const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'yt_v26_list.json';
+  a.download = 'yt_v27_list.json';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -336,24 +355,28 @@ function importJSONFile(file){
       if(cleaned.length===0){ return; }
       items = cleaned.map(o=>({id:o.id,title:o.title}));
       saveList(); renderList();
+      // IMPORTANT: we do NOT touch S_SETTINGS here (settings remembered)
     }catch(e){}
   };
   reader.readAsText(file);
 }
 
-// Presets
-function saveSettings(play,pause,dim,rand,bypass){
-  localStorage.setItem(S_SETTINGS, JSON.stringify({play,pause,dim,rand,bypass}));
+// Settings / Presets
+function saveSettings(play,pause,dim,rand,bypass,fsPref){
+  const base = {play,pause,dim,rand,bypass};
+  if(typeof fsPref==='boolean') base.fs = fsPref;
+  localStorage.setItem(S_SETTINGS, JSON.stringify(base));
 }
 function loadSettings(){
   try{
     const j = JSON.parse(localStorage.getItem(S_SETTINGS)||'null');
     if(j){
-      setFromSeconds(document.getElementById('playMin'),document.getElementById('playSec'), j.play||10);
-      setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'), j.pause||5);
+      setFromSeconds(document.getElementById('playMin'),document.getElementById('playSec'), j.play??10);
+      setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'), j.pause??5);
       document.getElementById('dimToggle').checked = !!j.dim;
       document.getElementById('randToggle').checked = !!j.rand;
       document.getElementById('bypassToggle').checked = !!j.bypass;
+      if(typeof j.fs==='boolean'){ document.getElementById('fsToggle').checked = j.fs; }
     }
   }catch(e){}
 }
@@ -379,12 +402,11 @@ function renderPresetChips(){
     chip.onclick = ()=>{
       setFromSeconds(document.getElementById('playMin'),document.getElementById('playSec'), p.play);
       setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'), p.pause);
-      saveSettings(p.play,p.pause, document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked, document.getElementById('bypassToggle').checked);
+      saveSettings(p.play,p.pause, document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked, document.getElementById('bypassToggle').checked, document.getElementById('fsToggle').checked);
       markActivePreset(p.play, p.pause);
     };
     holder.appendChild(chip);
   });
-  // mark active based on current fields
   markActivePreset(getPlaySec(), getPauseSec());
 }
 function markActivePreset(play, pause){
@@ -393,6 +415,9 @@ function markActivePreset(play, pause){
     ch.classList.toggle('active', ch.dataset.key===key);
   });
 }
+
+function getPlaySec(){ return normalize(document.getElementById('playMin'),document.getElementById('playSec')) }
+function getPauseSec(){ return normalize(document.getElementById('pauseMin'),document.getElementById('pauseSec')) }
 
 // YouTube API
 let player;
@@ -404,7 +429,7 @@ const pauseCoverPlayer=document.getElementById('pauseCoverPlayer');
 const dimToggle=document.getElementById('dimToggle');
 const randToggle=document.getElementById('randToggle');
 const bypassToggle=document.getElementById('bypassToggle');
-const titleOverlay=document.getElementById('titleOverlay');
+const fsToggle=document.getElementById('fsToggle');
 
 function installAllowAttrs(){
   const iframe = document.querySelector('#player iframe');
@@ -413,6 +438,20 @@ function installAllowAttrs(){
     iframe.setAttribute('allowfullscreen','');
   }
 }
+
+// Fullscreen helpers
+function requestFS(){
+  const el = document.documentElement;
+  if (!document.fullscreenElement && el.requestFullscreen){
+    el.requestFullscreen({navigationUI:'hide'}).catch(()=>{});
+  }
+}
+function maybeAutoFS(){
+  if(fsToggle.checked){
+    requestFS();
+  }
+}
+
 function onStateChange(e){
   if (e.data===YT.PlayerState.PAUSED || e.data===YT.PlayerState.UNSTARTED){
     if (dimToggle.checked) pauseCoverPlayer.style.display='block';
@@ -426,9 +465,8 @@ function onStateChange(e){
   }
 }
 function onError(e){
-  const code = e && typeof e.data!=='undefined' ? e.data : 'unknown';
-  let msg = "YouTube error: <b>"+code+"</b>.";
-  console.warn(msg);
+  // minimal visible noise; console only
+  console.warn('YT error', e && e.data);
 }
 function ensurePlayer(id){
   const origin = (location.origin && location.origin!=='null') ? location.origin : undefined;
@@ -466,13 +504,9 @@ function waitForPlaying(maxTries){
   });
 }
 
-function getPlaySec(){ return normalize(document.getElementById('playMin'),document.getElementById('playSec')) }
-function getPauseSec(){ return normalize(document.getElementById('pauseMin'),document.getElementById('pauseSec')) }
-
 let timers={p:null,q:null};
 let stepRunning=false;
 let resumeAt=0;
-
 function clearTimers(){ if(timers.p){clearTimeout(timers.p)} if(timers.q){clearTimeout(timers.q)} timers={p:null,q:null}; }
 function setPlayUIActive(on){
   const btn=document.getElementById('playBtn');
@@ -490,6 +524,7 @@ async function startPlainPlay(){
   clearTimers();
   setPauseUIActive(false);
   setPlayUIActive(true);
+  maybeAutoFS();
   const ok = await gestureSafePlay();
   if(!ok){ setPlayUIActive(false); }
 }
@@ -497,20 +532,21 @@ async function startPlainPlay(){
 async function startPlayStepper(){
   if(!player){ return; }
   if(bypassToggle.checked){
-    saveSettings(getPlaySec(), getPauseSec(), dimToggle.checked, randToggle.checked, true);
+    saveSettings(getPlaySec(), getPauseSec(), dimToggle.checked, randToggle.checked, true, fsToggle.checked);
     return startPlainPlay();
   }
   stepRunning=true; clearTimers();
   setPlayUIActive(true);
   const playS=Math.max(1,getPlaySec());
   const pauseS=Math.max(1,getPauseSec());
-  saveSettings(playS,pauseS, dimToggle.checked, randToggle.checked, false);
+  saveSettings(playS,pauseS, dimToggle.checked, randToggle.checked, false, fsToggle.checked);
   pushPreset(playS,pauseS);
   async function cyclePlay(){
     if(!stepRunning) return;
     try{ if(resumeAt>0){ player.seekTo(resumeAt,true); } }catch(e){}
     pauseCoverPlayer.style.display='none';
     setPauseUIActive(false);
+    maybeAutoFS();
     const ok = await gestureSafePlay();
     if(!ok){ stepRunning=false; setPlayUIActive(false); return; }
     timers.p=setTimeout(cyclePause, playS*1000);
@@ -536,23 +572,29 @@ function pauseNow(){
   stepRunning=false;
   clearTimers();
   try{ player.pauseVideo(); }catch(e){}
-  if (dimToggle.checked) pauseCoverPlayer.style.display='block';
+  if (document.getElementById('dimToggle').checked) pauseCoverPlayer.style.display='block';
   setPauseUIActive(true);
   setPlayUIActive(false);
 }
+
 function loadByIndex(idx, startCycle){
   if(idx<0 || idx>=items.length) return;
   currentIndex = idx;
   const it=items[idx];
   resumeAt=0;
   ensurePlayer(it.id);
-  setTitleOverlay(it.title||idToWatchUrl(it.id));
   renderList();
   if(startCycle){ startPlayStepper(); }
 }
-function setTitleOverlay(text){
-  titleOverlay.textContent = text || 'â€”';
-}
+
+document.addEventListener('keydown',(e)=>{
+  if(e.target && (/INPUT|TEXTAREA|SELECT/).test(e.target.tagName)) return;
+  if(e.key===' '){ startPlayStepper(); e.preventDefault();
+  }else if(e.key==='Pause'){ pauseNow(); e.preventDefault();
+  }else if(e.key==='ArrowRight'){ const ni=nextIndex(); if(ni>=0){ loadByIndex(ni,true);} e.preventDefault();
+  }else if(e.key==='ArrowLeft'){ const pi=prevIndex(); if(pi>=0){ loadByIndex(pi,true);} e.preventDefault(); }
+}, true);
+
 function nextIndex(){
   if(items.length===0) return -1;
   if(randToggle.checked){
@@ -571,14 +613,6 @@ function prevIndex(){
   }
   return (currentIndex-1+items.length) % items.length;
 }
-
-document.addEventListener('keydown',(e)=>{
-  if(e.target && (/INPUT|TEXTAREA|SELECT/).test(e.target.tagName)) return;
-  if(e.key===' '){ startPlayStepper(); e.preventDefault();
-  }else if(e.key==='Pause'){ pauseNow(); e.preventDefault();
-  }else if(e.key==='ArrowRight'){ const ni=nextIndex(); if(ni>=0){ loadByIndex(ni,true);} e.preventDefault();
-  }else if(e.key==='ArrowLeft'){ const pi=prevIndex(); if(pi>=0){ loadByIndex(pi,true);} e.preventDefault(); }
-}, true);
 
 document.getElementById('playBtn').addEventListener('click', startPlayStepper);
 document.getElementById('pauseBtn').addEventListener('click', pauseNow);
@@ -602,15 +636,19 @@ document.getElementById('importFile').addEventListener('change', (e)=>{
 
 ['playMin','playSec','pauseMin','pauseSec'].forEach(id=>{
   document.getElementById(id).addEventListener('input', ()=>{
-    // realign seconds > 59 as user types but mostly just update highlight
     const play = getPlaySec();
     const pause = getPauseSec();
-    saveSettings(play,pause, document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked, document.getElementById('bypassToggle').checked);
+    saveSettings(play,pause, document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked, document.getElementById('bypassToggle').checked, fsToggle.checked);
     markActivePreset(play, pause);
   });
 });
 
-// Seed URLs (first run)
+document.getElementById('fsToggle').addEventListener('change', (e)=>{
+  saveSettings(getPlaySec(), getPauseSec(), document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked, document.getElementById('bypassToggle').checked, e.target.checked);
+  if(e.target.checked){ requestFS(); } else { if(document.fullscreenElement){ document.exitFullscreen().catch(()=>{}); } }
+});
+
+// Seed URLs (first run only)
 const SEED_URLS=[
   "https://www.youtube.com/watch?v=jiJ-wZch_vQ",
   "https://www.youtube.com/watch?v=4yv4ea1pFp4&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=3",
@@ -647,11 +685,16 @@ const SEED_URLS=[
   }
   renderList();
   ensurePlayer(items[0]?.id || "jiJ-wZch_vQ");
-  document.getElementById('titleOverlay').textContent = items[0]?.title || 'â€”';
   // Presets
   renderPresetChips();
-  // initial active highlight
-  markActivePreset(getPlaySec(), getPauseSec());
+  // Try to go fullscreen shortly after load if pref is already on (mobile UX)
+  if(document.getElementById('fsToggle').checked){
+    setTimeout(requestFS, 400);
+    // Also try on first interaction
+    ['touchstart','click'].forEach(ev=>{
+      window.addEventListener(ev, function once(){ requestFS(); window.removeEventListener(ev, once, {passive:true}); }, {passive:true});
+    });
+  }
 })();
 </script>
 </body>
