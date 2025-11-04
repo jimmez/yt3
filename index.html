@@ -193,7 +193,7 @@
   setTimeout(()=> wm.classList.remove('show'), 5000);
 })();
 
-const S_LIST='YT21_LIST';
+const S_LIST='YT29_LIST';
 const S_SETTINGS='YT21_SETTINGS';
 const S_PRESETS='YT21_PRESETS';
 
@@ -644,7 +644,8 @@ document.getElementById('fsToggle').addEventListener('change', (e)=>{
 });
 
 
-// Seed URLs (always append on load; dedupe by id)
+
+// Seed URLs (always insert at TOP on load; dedupe by id)
 const SEED_URLS=[
   "https://www.youtube.com/watch?v=jiJ-wZch_vQ",
   "https://www.youtube.com/watch?v=4yv4ea1pFp4&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=3",
@@ -671,6 +672,17 @@ function ensureSeedUrlsPresent(){
       toAdd.push({id, title:'(loading...)'});
       existing.add(id);
     }
+  }
+  if(toAdd.length){
+    // insert at TOP, preserving user items order under them
+    items = toAdd.concat(items);
+    saveList();
+    toAdd.forEach(async (it)=>{
+      const t = await fetchTitleForId(it.id);
+      it.title = t; saveList(); renderList();
+    });
+  }
+}
   }
   if(toAdd.length){
     items = items.concat(toAdd);
