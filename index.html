@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>YT play/pause â€” v32</title>
+<title>YT play/pause â€” v33</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
@@ -87,7 +87,7 @@
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause â€” v32</h1>
+    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause â€” v33</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -317,10 +317,10 @@ function renderList(){
     const title = document.createElement('input'); title.className='titleEditable'; title.value = it.title || '(untitled video)';
     title.title = 'Edit title. Double-click to play.';
     title.addEventListener('change', ()=> updateTitle(idx, title.value));
-    title.addEventListener('dblclick', ()=>{ if(randToggle.checked && document.getElementById('randLastToggle').checked){ const id=items[idx]?.id; resumeAt=getLastPos(id); } else { resumeAt=0; } loadByIndex(idx, true); setTab('player'); });
+    title.addEventListener('dblclick', ()=>{ let r=0; if(randToggle.checked && document.getElementById('randLastToggle').checked){ const id=items[idx]?.id; r=getLastPos(id); } loadByIndex(idx, true, r); setTab('player'); });
     const btnPlay = document.createElement('button'); btnPlay.className='btn-icon'; btnPlay.title='Play this';
     btnPlay.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>';
-    btnPlay.onclick=()=>{ if(randToggle.checked && document.getElementById('randLastToggle').checked){ const id=items[idx]?.id; resumeAt=getLastPos(id); } else { resumeAt=0; } loadByIndex(idx,true); setTab('player'); };
+    btnPlay.onclick=()=>{ let r=0; if(randToggle.checked && document.getElementById('randLastToggle').checked){ const id=items[idx]?.id; r=getLastPos(id); } loadByIndex(idx,true,r); setTab('player'); };
     const btnUp = document.createElement('button'); btnUp.className='btn-icon'; btnUp.title='Move up';
     btnUp.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.59 5.58L20 12 12 4 4 12z"/></svg>';
     btnUp.onclick=()=>moveItem(idx,-1);
@@ -584,10 +584,11 @@ async function startPlayStepper(){
         let nxt = Math.floor(Math.random()*items.length);
         if(items.length>1 && currentIndex>=0 && nxt===currentIndex) nxt=(nxt+1)%items.length;
         // If 'Rand.-last pos.' is on, set resumeAt to the saved last position for the next video
+        let nextResume = 0;
         if(document.getElementById('randLastToggle').checked){
-          const idNext = items[nxt]?.id; if(idNext){ resumeAt = getLastPos(idNext); }
-        } else { resumeAt = 0; }
-        loadByIndex(nxt, false);
+          const idNext = items[nxt]?.id; if(idNext){ nextResume = getLastPos(idNext); }
+        }
+        loadByIndex(nxt, false, nextResume);
       }
       cyclePlay();
     }, pauseS*1000);
@@ -604,11 +605,12 @@ function pauseNow(){
   setPlayUIActive(false);
 }
 
-function loadByIndex(idx, startCycle){
+function loadByIndex(idx, startCycle, resumeSeconds){
   if(idx<0 || idx>=items.length) return;
   currentIndex = idx;
   const it=items[idx];
-  resumeAt=0;
+  if(typeof resumeSeconds==='number'){ resumeAt = Math.max(0, Math.floor(resumeSeconds)); }
+  else { resumeAt = 0; }
   ensurePlayer(it.id);
   renderList();
   if(startCycle){ startPlayStepper(); }
@@ -643,8 +645,8 @@ function prevIndex(){
 
 document.getElementById('playBtn').addEventListener('click', startPlayStepper);
 document.getElementById('pauseBtn').addEventListener('click', pauseNow);
-document.getElementById('nextBtn').addEventListener('click', ()=>{ const ni=nextIndex(); if(ni>=0){ if(randToggle.checked && document.getElementById('randLastToggle').checked){ const idNext=items[ni]?.id; resumeAt=getLastPos(idNext); } else { resumeAt=0; } loadByIndex(ni,true);} });
-document.getElementById('prevBtn').addEventListener('click', ()=>{ const pi=prevIndex(); if(pi>=0){ if(randToggle.checked && document.getElementById('randLastToggle').checked){ const idPrev=items[pi]?.id; resumeAt=getLastPos(idPrev); } else { resumeAt=0; } loadByIndex(pi,true);} });
+document.getElementById('nextBtn').addEventListener('click', ()=>{ const ni=nextIndex(); if(ni>=0){ let r=0; if(randToggle.checked && document.getElementById('randLastToggle').checked){ const idNext=items[ni]?.id; r=getLastPos(idNext); } loadByIndex(ni,true,r);} });
+document.getElementById('prevBtn').addEventListener('click', ()=>{ const pi=prevIndex(); if(pi>=0){ let r=0; if(randToggle.checked && document.getElementById('randLastToggle').checked){ const idPrev=items[pi]?.id; r=getLastPos(idPrev); } loadByIndex(pi,true,r);} });
 
 document.getElementById('addUrlBtn').addEventListener('click', async()=>{
   const raw = document.getElementById('urlInput').value.trim();
