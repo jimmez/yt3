@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>YT play/pause â€” v35</title>
+<title>YT play/pause â€” v36</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
@@ -87,7 +87,7 @@
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause â€” v35</h1>
+    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause â€” v36</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -177,6 +177,10 @@
         <button id="importBtn" class="btn-small" title="Import list from JSON">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9v10H5V9H3v12h18V9h-2zM11 16V5.8L8 8.9 6.6 7.5 12 2l5.4 5.5L16 8.9l-3-3.1V16h-2z"/></svg>
           <span>Import</span>
+        </button>
+        <button id="fetchTitlesBtn" class="btn-small" title="Fetch missing titles (Shift+Click to refetch all)">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v2a7 7 0 1 1-7 7H3a9 9 0 1 0 9-9zm-1 6h2v6h-2V9zm0 8h2v2h-2v-2z"/></svg>
+          <span>Title fetch</span>
         </button>
       </div>
     </div>
@@ -361,6 +365,8 @@ function importJSONFile(file){
       if(cleaned.length===0){ return; }
       items = cleaned.map(o=>({id:o.id,title:o.title}));
       saveList(); renderList();
+      // Auto-fill missing titles after import
+      fetchTitlesForList(true);
       // Settings are preserved; no change to S_SETTINGS
     }catch(e){}
   };
@@ -385,6 +391,26 @@ function getLastPos(videoId){
   const map = loadPosMap();
   const v = map[videoId];
   return typeof v==='number' ? Math.max(0, v) : 0;
+}
+
+
+async function fetchTitlesForList(missingOnly=true){
+  let changed = false;
+  for (let i=0;i<items.length;i++){
+    const it = items[i];
+    const needs = !it.title || it.title.trim()==='' || it.title.trim()==='(untitled video)';
+    if (!missingOnly || needs){
+      try{
+        const t = await fetchTitleForId(it.id);
+        if (t && t.trim() && t !== it.title){
+          it.title = t.trim();
+          changed = true;
+          renderList();
+        }
+      }catch(e){}
+    }
+  }
+  if (changed){ saveList(); renderList(); }
 }
 
 // Settings / Presets
@@ -660,6 +686,9 @@ document.getElementById('addUrlBtn').addEventListener('click', async()=>{
 });
 document.getElementById('exportBtn').addEventListener('click', exportJSON);
 document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
+document.getElementById('fetchTitlesBtn').addEventListener('click', (e)=>{
+  const all = e.shiftKey === true; fetchTitlesForList(!all);
+});
 document.getElementById('importFile').addEventListener('change', (e)=>{
   const f=e.target.files && e.target.files[0];
   if(f) importJSONFile(f);
