@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>YT play/pause â€” v28</title>
+<title>YT play/pause â€” v30</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
@@ -87,6 +87,7 @@
   </div>
 
   <div class="card page active" id="pagePlayer">
+    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause â€” v30</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -193,7 +194,7 @@
   setTimeout(()=> wm.classList.remove('show'), 5000);
 })();
 
-const S_LIST='YT29_LIST';
+const S_LIST='YT21_LIST';
 const S_SETTINGS='YT21_SETTINGS';
 const S_PRESETS='YT21_PRESETS';
 
@@ -644,8 +645,7 @@ document.getElementById('fsToggle').addEventListener('change', (e)=>{
 });
 
 
-
-// Seed URLs (always insert at TOP on load; dedupe by id)
+// Seed URLs (always ensure present on load; append if missing, deduped by video ID)
 const SEED_URLS=[
   "https://www.youtube.com/watch?v=jiJ-wZch_vQ",
   "https://www.youtube.com/watch?v=4yv4ea1pFp4&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=3",
@@ -663,7 +663,7 @@ const SEED_URLS=[
   "https://www.youtube.com/watch?v=ISRmHPuuX5s&list=PLj_R-xNx8BKgoruOpG2U4dOmjuWZUvlsH&index=16"
 ];
 
-function ensureSeedUrlsPresent(){
+function ensureSeedUrlsPresentAppend(){
   const existing = new Set(items.map(it=>it.id));
   const toAdd = [];
   for(const u of SEED_URLS){
@@ -672,17 +672,6 @@ function ensureSeedUrlsPresent(){
       toAdd.push({id, title:'(loading...)'});
       existing.add(id);
     }
-  }
-  if(toAdd.length){
-    // insert at TOP, preserving user items order under them
-    items = toAdd.concat(items);
-    saveList();
-    toAdd.forEach(async (it)=>{
-      const t = await fetchTitleForId(it.id);
-      it.title = t; saveList(); renderList();
-    });
-  }
-}
   }
   if(toAdd.length){
     items = items.concat(toAdd);
