@@ -141,6 +141,10 @@
         <label class="switch" title="Play random items"><input id="randToggle" type="checkbox"><span class="slider"></span></label>
       </div>
       <div class="switchWrap">
+        <div class="switchLabel">Rand.-last pos.</div>
+        <label class="switch" title="When Random is on, resume each video from its last paused position"><input id="randLastToggle" type="checkbox" checked><span class="slider"></span></label>
+      </div>
+      <div class="switchWrap">
         <div class="switchLabel">Bypass timings</div>
         <label class="switch" title="Play full video, ignore timings"><input id="bypassToggle" type="checkbox"><span class="slider"></span></label>
       </div>
@@ -197,6 +201,7 @@
 const S_LIST='YT21_LIST';
 const S_SETTINGS='YT21_SETTINGS';
 const S_PRESETS='YT21_PRESETS';
+const S_LASTPOS='YT21_LASTPOS';
 
 const tabPlayer=document.getElementById('tabPlayer');
 const tabUrls=document.getElementById('tabUrls');
@@ -312,10 +317,10 @@ function renderList(){
     const title = document.createElement('input'); title.className='titleEditable'; title.value = it.title || '(untitled video)';
     title.title = 'Edit title. Double-click to play.';
     title.addEventListener('change', ()=> updateTitle(idx, title.value));
-    title.addEventListener('dblclick', ()=>{ loadByIndex(idx, true); setTab('player'); });
+    title.addEventListener('dblclick', ()=>{ if(randToggle.checked && document.getElementById('randLastToggle').checked){ const id=items[idx]?.id; resumeAt=getLastPos(id); } else { resumeAt=0; } loadByIndex(idx, true); setTab('player'); });
     const btnPlay = document.createElement('button'); btnPlay.className='btn-icon'; btnPlay.title='Play this';
     btnPlay.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>';
-    btnPlay.onclick=()=>{ loadByIndex(idx,true); setTab('player'); };
+    btnPlay.onclick=()=>{ if(randToggle.checked && document.getElementById('randLastToggle').checked){ const id=items[idx]?.id; resumeAt=getLastPos(id); } else { resumeAt=0; } loadByIndex(idx,true); setTab('player'); };
     const btnUp = document.createElement('button'); btnUp.className='btn-icon'; btnUp.title='Move up';
     btnUp.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.59 5.58L20 12 12 4 4 12z"/></svg>';
     btnUp.onclick=()=>moveItem(idx,-1);
@@ -362,9 +367,29 @@ function importJSONFile(file){
   reader.readAsText(file);
 }
 
+
+// Per-video last paused positions
+function loadPosMap(){
+  try{ return JSON.parse(localStorage.getItem(S_LASTPOS)||'{}') || {}; }catch(e){ return {}; }
+}
+function savePosMap(map){
+  try{ localStorage.setItem(S_LASTPOS, JSON.stringify(map)); }catch(e){}
+}
+function recordLastPos(videoId, seconds){
+  if(!videoId) return;
+  const map = loadPosMap();
+  map[videoId] = Math.max(0, Math.floor(seconds||0));
+  savePosMap(map);
+}
+function getLastPos(videoId){
+  const map = loadPosMap();
+  const v = map[videoId];
+  return typeof v==='number' ? Math.max(0, v) : 0;
+}
+
 // Settings / Presets
-function saveSettings(play,pause,dim,rand,bypass,fsPref){
-  const base = {play,pause,dim,rand,bypass};
+function saveSettings(play,pause,dim,rand,bypass,fsPref,randLast){
+  const base = {play,pause,dim,rand,bypass,randLast};
   if(typeof fsPref==='boolean') base.fs = fsPref;
   localStorage.setItem(S_SETTINGS, JSON.stringify(base));
 }
@@ -376,6 +401,7 @@ function loadSettings(){
       setFromSeconds(document.getElementById('pauseMin'),document.getElementById('pauseSec'), j.pause??5);
       document.getElementById('dimToggle').checked = !!j.dim;
       document.getElementById('randToggle').checked = !!j.rand;
+      document.getElementById('randLastToggle').checked = (j.randLast!==false);
       document.getElementById('bypassToggle').checked = !!j.bypass;
       if(typeof j.fs==='boolean'){ document.getElementById('fsToggle').checked = j.fs; }
     }
@@ -549,7 +575,7 @@ async function startPlayStepper(){
   }
   function cyclePause(){
     if(!stepRunning) return;
-    try{ resumeAt = player.getCurrentTime()||0; player.pauseVideo(); }catch(e){}
+    try{ resumeAt = player.getCurrentTime()||0; const id=items[currentIndex]?.id; if(id){ recordLastPos(id, resumeAt); } player.pauseVideo(); }catch(e){}
     if (dimToggle.checked) pauseCoverPlayer.style.display='block';
     setPauseUIActive(true);
     setPlayUIActive(false);
@@ -557,6 +583,10 @@ async function startPlayStepper(){
       if(randToggle.checked && items.length>0){
         let nxt = Math.floor(Math.random()*items.length);
         if(items.length>1 && currentIndex>=0 && nxt===currentIndex) nxt=(nxt+1)%items.length;
+        // If 'Rand.-last pos.' is on, set resumeAt to the saved last position for the next video
+        if(document.getElementById('randLastToggle').checked){
+          const idNext = items[nxt]?.id; if(idNext){ resumeAt = getLastPos(idNext); }
+        } else { resumeAt = 0; }
         loadByIndex(nxt, false);
       }
       cyclePlay();
@@ -567,6 +597,7 @@ async function startPlayStepper(){
 function pauseNow(){
   stepRunning=false;
   clearTimers();
+  try{ const id=items[currentIndex]?.id; const t=player.getCurrentTime&&player.getCurrentTime(); if(id && typeof t==='number'){ recordLastPos(id, t); } }catch(e){}
   try{ player.pauseVideo(); }catch(e){}
   if (document.getElementById('dimToggle').checked) pauseCoverPlayer.style.display='block';
   setPauseUIActive(true);
@@ -612,8 +643,8 @@ function prevIndex(){
 
 document.getElementById('playBtn').addEventListener('click', startPlayStepper);
 document.getElementById('pauseBtn').addEventListener('click', pauseNow);
-document.getElementById('nextBtn').addEventListener('click', ()=>{ const ni=nextIndex(); if(ni>=0) loadByIndex(ni,true); });
-document.getElementById('prevBtn').addEventListener('click', ()=>{ const pi=prevIndex(); if(pi>=0) loadByIndex(pi,true); });
+document.getElementById('nextBtn').addEventListener('click', ()=>{ const ni=nextIndex(); if(ni>=0){ if(randToggle.checked && document.getElementById('randLastToggle').checked){ const idNext=items[ni]?.id; resumeAt=getLastPos(idNext); } else { resumeAt=0; } loadByIndex(ni,true);} });
+document.getElementById('prevBtn').addEventListener('click', ()=>{ const pi=prevIndex(); if(pi>=0){ if(randToggle.checked && document.getElementById('randLastToggle').checked){ const idPrev=items[pi]?.id; resumeAt=getLastPos(idPrev); } else { resumeAt=0; } loadByIndex(pi,true);} });
 
 document.getElementById('addUrlBtn').addEventListener('click', async()=>{
   const raw = document.getElementById('urlInput').value.trim();
@@ -715,3 +746,4 @@ function ensureSeedUrlsPresentAppend(){
 </script>
 </body>
 </html>
+
