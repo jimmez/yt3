@@ -3,12 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>YT play/pause â€” v27</title>
+<title>YT play/pause â€” v28</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
-    --accent:#3e56a8; /* softer blue (subtle) */
-    --amber:#b89557;  /* not used much now */
+    --accent:#3e56a8; /* subtle blue */
     --shadow:0 10px 30px rgba(0,0,0,.25);
     --btn:#2c323b; --btn-hover:#343a45; --chip:#22262d; --chip-border:#2f3540;
     --btn-grey:#59616c;        /* idle grey for play */
@@ -17,10 +16,9 @@
   html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans");}
   .wrap{max-width:1100px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:16px}
   .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px}
-  h1{font-size:20px;margin:0 0 8px;color:#e2e8f0}
   h2{font-size:16px;margin:0 0 8px;color:#cbd5e1}
   label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
-  input[type="text"],input[type="number"]{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #2a2d33;background:#0f1115;color:var(--fg);outline:none;font-size:16px}
+  input[type="text"],input[type="number"]{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #2a2d33;background:#0f1115;color:#fff;outline:none;font-size:16px}
   button{padding:10px 14px;border-radius:12px;border:0;background:var(--btn);color:#fff;font-weight:700;cursor:pointer;font-size:14px;white-space:nowrap}
   button:hover{background:var(--btn-hover)}
   .playerWrap{position:relative}
@@ -31,11 +29,11 @@
   .chip{padding:8px 10px;border-radius:999px;background:var(--chip);border:1px solid var(--chip-border);font-size:12px;cursor:pointer;transition:filter .15s, box-shadow .15s, background .15s}
   .chip:hover{filter:brightness(1.08)}
   .chip.active{box-shadow:0 0 0 2px var(--accent) inset;background:rgba(62,86,168,.18)}
-  .btn-icon{height:54px;min-width:54px;padding:0 18px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--btn)}
-  .btn-icon svg{width:24px;height:24px}
-  .btn-wide{min-width:min(22vw,160px)} /* responsive to keep one row on mobile */
+  .btn-icon{height:52px;min-width:52px;padding:0 14px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--btn)}
+  .btn-icon svg{width:22px;height:22px}
+  .btn-wide{min-width:min(20vw,140px)} /* narrower so all 4 fit on S23 */
   .btn-play{background:var(--btn-grey)} /* grey when idle or paused */
-  .btn-play.active{background:var(--accent); filter:saturate(.6) brightness(.92)} /* subtle blue when active */
+  .btn-play.active{background:var(--accent); filter:saturate(.55) brightness(.92)} /* subtle blue when active */
   .btn-pause{background:var(--btn)}
   .btn-pause.active{background:var(--btn-pause)} /* subtle grey diff when paused */
   .btn-tab{background:transparent;border:1px solid #2f3540}
@@ -46,7 +44,7 @@
   .list{display:flex;flex-direction:column;gap:8px;margin-top:8px;max-height:520px;overflow:auto}
   .item{display:grid;grid-template-columns:auto 1fr auto auto auto auto;gap:8px;align-items:center;background:#0f1115;border:1px solid #2a2d33;border-radius:12px;padding:8px}
   .idx{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:#23262d;border-radius:8px;color:#cbd5e1;font-size:12px}
-  .titleEditable{border:0;background:transparent;color:var(--fg);font-size:14px;padding:8px;border-radius:8px}
+  .titleEditable{border:0;background:transparent;color:#fff;font-size:14px;padding:8px;border-radius:8px}
   .titleEditable:focus{outline:1px solid #3a3f47;background:#111319}
   .banner{padding:10px 12px;border-radius:12px;background:#2a2d33;color:#e5e7eb;font-size:13px}
   .banner.danger{background:#3b1111;color:#fee2e2;border:1px solid #7f1d1d}
@@ -66,13 +64,15 @@
   .timeGroup label{margin:0}
   .timeGroup input[type="number"]{width:86px;text-align:right}
   /* controls one line */
-  .topControls{display:flex;gap:10px;align-items:center;flex-wrap:nowrap;overflow-x:auto}
+  .topControls{display:flex;gap:8px;align-items:center;flex-wrap:nowrap;overflow-x:auto}
   /* watermark */
   .watermark{position:fixed;right:16px;top:16px;background:rgba(0,0,0,.65);padding:8px 12px;border-radius:10px;z-index:50;opacity:0;transition:opacity .4s}
   .watermark.show{opacity:1}
   /* labeled small buttons on URL page */
   .btn-small{display:inline-flex;align-items:center;gap:6px;padding:10px 12px;border-radius:10px}
   .btn-small svg{width:18px;height:18px}
+  /* toggle block under presets */
+  .togglesRow{display:flex;gap:24px;flex-wrap:wrap;margin-top:12px}
 </style>
 </head>
 <body>
@@ -87,7 +87,6 @@
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1>YT play/pause â€” v27</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -109,25 +108,6 @@
       <button id="nextBtn" title="Next" class="btn-icon btn-wide" aria-label="Next">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"/></svg>
       </button>
-
-      <div class="row" style="margin-left:auto;gap:14px">
-        <div class="switchWrap">
-          <div class="switchLabel">Dim on pause</div>
-          <label class="switch" title="Dim player on pause"><input id="dimToggle" type="checkbox"><span class="slider"></span></label>
-        </div>
-        <div class="switchWrap">
-          <div class="switchLabel">Random</div>
-          <label class="switch" title="Play random items"><input id="randToggle" type="checkbox"><span class="slider"></span></label>
-        </div>
-        <div class="switchWrap">
-          <div class="switchLabel">Bypass timings</div>
-          <label class="switch" title="Play full video, ignore timings"><input id="bypassToggle" type="checkbox"><span class="slider"></span></label>
-        </div>
-        <div class="switchWrap">
-          <div class="switchLabel">Fullscreen</div>
-          <label class="switch" title="Open in fullscreen (mobile friendly)"><input id="fsToggle" type="checkbox" checked><span class="slider"></span></label>
-        </div>
-      </div>
     </div>
 
     <!-- Times in one line -->
@@ -148,6 +128,27 @@
 
     <h2>Quick presets (last 10)</h2>
     <div class="chips" id="presetChips"></div>
+
+    <!-- Moved toggles under presets -->
+    <div class="togglesRow">
+      <div class="switchWrap">
+        <div class="switchLabel">Dim on pause</div>
+        <label class="switch" title="Dim player on pause"><input id="dimToggle" type="checkbox"><span class="slider"></span></label>
+      </div>
+      <div class="switchWrap">
+        <div class="switchLabel">Random</div>
+        <label class="switch" title="Play random items"><input id="randToggle" type="checkbox"><span class="slider"></span></label>
+      </div>
+      <div class="switchWrap">
+        <div class="switchLabel">Bypass timings</div>
+        <label class="switch" title="Play full video, ignore timings"><input id="bypassToggle" type="checkbox"><span class="slider"></span></label>
+      </div>
+      <div class="switchWrap">
+        <div class="switchLabel">Fullscreen</div>
+        <label class="switch" title="Open in fullscreen (mobile friendly)"><input id="fsToggle" type="checkbox" checked><span class="slider"></span></label>
+      </div>
+    </div>
+
     <div class="banner" style="margin-top:10px">Space = Play. Pause/Break = Pause. â† / â†’ = Previous / Next.</div>
   </div>
 
@@ -195,7 +196,6 @@
 const S_LIST='YT21_LIST';
 const S_SETTINGS='YT21_SETTINGS';
 const S_PRESETS='YT21_PRESETS';
-const S_FULLSCREEN='YT21_FULLSCREEN';
 
 const tabPlayer=document.getElementById('tabPlayer');
 const tabUrls=document.getElementById('tabUrls');
@@ -312,6 +312,9 @@ function renderList(){
     title.title = 'Edit title. Double-click to play.';
     title.addEventListener('change', ()=> updateTitle(idx, title.value));
     title.addEventListener('dblclick', ()=>{ loadByIndex(idx, true); setTab('player'); });
+    const btnPlay = document.createElement('button'); btnPlay.className='btn-icon'; btnPlay.title='Play this';
+    btnPlay.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>';
+    btnPlay.onclick=()=>{ loadByIndex(idx,true); setTab('player'); };
     const btnUp = document.createElement('button'); btnUp.className='btn-icon'; btnUp.title='Move up';
     btnUp.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.59 5.58L20 12 12 4 4 12z"/></svg>';
     btnUp.onclick=()=>moveItem(idx,-1);
@@ -320,10 +323,7 @@ function renderList(){
     btnDown.onclick=()=>moveItem(idx,1);
     const btnTop = document.createElement('button'); btnTop.className='btn-icon'; btnTop.title='Move to top';
     btnTop.textContent='â‡¡Top'; btnTop.onclick=()=>moveToTop(idx);
-    const btnPlay = document.createElement('button'); btnPlay.className='btn-icon'; btnPlay.title='Play this';
-    btnPlay.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>';
-    btnPlay.onclick=()=>{ loadByIndex(idx,true); setTab('player'); };
-    row.appendChild(idxBox); row.appendChild(title); row.appendChild(btnUp); row.appendChild(btnDown); row.appendChild(btnTop); row.appendChild(btnPlay);
+    row.appendChild(idxBox); row.appendChild(title); row.appendChild(btnPlay); row.appendChild(btnUp); row.appendChild(btnDown); row.appendChild(btnTop);
     if(idx===currentIndex){ row.style.boxShadow='0 0 0 2px rgba(62,86,168,.5) inset'; }
     list.appendChild(row);
   });
@@ -333,7 +333,7 @@ function exportJSON(){
   const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'yt_v27_list.json';
+  a.download = 'yt_v28_list.json';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -355,7 +355,7 @@ function importJSONFile(file){
       if(cleaned.length===0){ return; }
       items = cleaned.map(o=>({id:o.id,title:o.title}));
       saveList(); renderList();
-      // IMPORTANT: we do NOT touch S_SETTINGS here (settings remembered)
+      // Settings are preserved; no change to S_SETTINGS
     }catch(e){}
   };
   reader.readAsText(file);
@@ -447,9 +447,7 @@ function requestFS(){
   }
 }
 function maybeAutoFS(){
-  if(fsToggle.checked){
-    requestFS();
-  }
+  if(fsToggle.checked){ requestFS(); }
 }
 
 function onStateChange(e){
@@ -464,10 +462,7 @@ function onStateChange(e){
     setPlayUIActive(true);
   }
 }
-function onError(e){
-  // minimal visible noise; console only
-  console.warn('YT error', e && e.data);
-}
+function onError(e){ console.warn('YT error', e && e.data); }
 function ensurePlayer(id){
   const origin = (location.origin && location.origin!=='null') ? location.origin : undefined;
   if(!player){
@@ -638,7 +633,7 @@ document.getElementById('importFile').addEventListener('change', (e)=>{
   document.getElementById(id).addEventListener('input', ()=>{
     const play = getPlaySec();
     const pause = getPauseSec();
-    saveSettings(play,pause, document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked, document.getElementById('bypassToggle').checked, fsToggle.checked);
+    saveSettings(play,pause, document.getElementById('dimToggle').checked, document.getElementById('randToggle').checked, document.getElementById('bypassToggle').checked, document.getElementById('fsToggle').checked);
     markActivePreset(play, pause);
   });
 });
@@ -690,7 +685,6 @@ const SEED_URLS=[
   // Try to go fullscreen shortly after load if pref is already on (mobile UX)
   if(document.getElementById('fsToggle').checked){
     setTimeout(requestFS, 400);
-    // Also try on first interaction
     ['touchstart','click'].forEach(ev=>{
       window.addEventListener(ev, function once(){ requestFS(); window.removeEventListener(ev, once, {passive:true}); }, {passive:true});
     });
