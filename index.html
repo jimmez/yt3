@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>YT play/pause - v41</title>
+<title>YT play/pause - v42</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
@@ -114,7 +114,7 @@
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause - v41</h1>
+    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause - v42</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -278,12 +278,11 @@ const pagePlayer=document.getElementById('pagePlayer');
 const pageUrls=document.getElementById('pageUrls');
 const pageUrls2=document.getElementById('pageUrls2');
 function setTab(which){
-  // reset active states
-  [tabPlayer, tabUrls, tabUrls2].filter(Boolean).forEach(b=>b.classList.remove('active'));
-  [pagePlayer, pageUrls, pageUrls2].filter(Boolean).forEach(p=>p.classList.remove('active'));
-  if(which==='player'){ tabPlayer.classList.add('active'); pagePlayer.classList.add('active'); }
-  else if(which==='urls2'){ tabUrls2.classList.add('active'); pageUrls2.classList.add('active'); }
-  else { tabUrls.classList.add('active'); pageUrls.classList.add('active'); }
+  [tabPlayer,tabUrls,tabUrls2].filter(Boolean).forEach(b=>b.classList.remove('active'));
+  [pagePlayer,pageUrls,pageUrls2].filter(Boolean).forEach(p=>p.classList.remove('active'));
+  if(which==='player'){ tabPlayer?.classList.add('active'); pagePlayer?.classList.add('active'); }
+  else if(which==='urls2'){ tabUrls2?.classList.add('active'); pageUrls2?.classList.add('active'); }
+  else { tabUrls?.classList.add('active'); pageUrls?.classList.add('active'); }
 }
 tabPlayer.onclick=()=>setTab('player');
 if(tabUrls2) tabUrls2.onclick=()=>setTab('urls2');
@@ -1030,9 +1029,6 @@ document.getElementById('addUrlBtn').addEventListener('click', async()=>{
 });
 document.getElementById('exportBtn').addEventListener('click', exportJSON);
 document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
-document.getElementById('fetchTitlesBtn').addEventListener('click', (e)=>{
-  const all = e.shiftKey === true; fetchTitlesForList(!all);
-});
 
 // URL list 2 controls
 const urlInput2 = document.getElementById('urlInput2');
@@ -1041,6 +1037,9 @@ const exportBtn2 = document.getElementById('exportBtn2');
 if(addUrlBtn2){ addUrlBtn2.addEventListener('click', async()=>{ const raw=(urlInput2.value||'').trim(); if(!raw) return; await addItemByUrl(raw); urlInput2.value=''; if(currentIndex===-1 && items.length>0){ loadByIndex(0,false); } }); }
 if(exportBtn2){ exportBtn2.addEventListener('click', exportJSON); }
 
+document.getElementById('fetchTitlesBtn').addEventListener('click', (e)=>{
+  const all = e.shiftKey === true; fetchTitlesForList(!all);
+});
 document.getElementById('importFile').addEventListener('change', (e)=>{
   const f=e.target.files && e.target.files[0];
   if(f) importJSONFile(f);
