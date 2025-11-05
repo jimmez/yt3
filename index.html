@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>YT play/pause - v40</title>
+<title>YT play/pause - v41</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
@@ -89,6 +89,13 @@
   .result .actions{padding:10px 12px;display:flex;gap:8px}
   .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#22262d;border:1px solid #2f3540;font-size:12px}
 
+  
+  /* timer yellow warning */
+  .yellowify * { color:#ffd24d !important; }
+  /* List 2 with thumbnails */
+  .item2{display:grid;grid-template-columns:80px 1fr auto auto auto auto;gap:8px;align-items:center;background:#0f1115;border:1px solid #2a2d33;border-radius:12px;padding:8px}
+  .thumb{width:100%;height:56px;border-radius:8px;background:#000;object-fit:cover}
+
   /* toggle block under presets */
   .togglesRow{display:flex;gap:24px;flex-wrap:wrap;margin-top:12px}
 </style>
@@ -101,12 +108,13 @@
 
   <div class="tabs">
     <button id="tabPlayer" class="btn-tab active">Player</button>
-    <button id="tabUrls" class="btn-tab">URL list=</button>
-    <button id="tabSearch" class="btn-tab">Search</button>
+    <button id="tabUrls" class="btn-tab">URL list 1</button>
+    <button id="tabUrls2" class="btn-tab">URL list 2</button>
+    
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause - v40</h1>
+    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause - v41</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -216,16 +224,32 @@
     <div class="list" id="list"></div>
   </div>
 
-  <div class="card page" id="pageSearch">
-    <h2>Search YouTube</h2>
-    <div class="searchWrap">
-      <input id="searchInput" type="text" placeholder="Type to search...">
-      <button id="searchBtn">Search</button>
-      <span id="searchStatus" class="badge" style="display:none"></span>
-    </div>
-    <div class="results" id="searchResults"></div>
+  <div class="results" id="searchResults"></div>
     <div class="banner" style="margin-top:10px">Tip: Click a result to <b>Add & Play</b>. Uses a public API â€“ if results are empty, try again or different keywords.</div>
   </div>
+
+  <div class="card page" id="pageUrls2">
+    <h2>URL list 2 (with thumbnails)</h2>
+    <div class="row" style="gap:8px;align-items:flex-start">
+      <div style="flex:1">
+        <label>Add YouTube URL</label>
+        <input id="urlInput2" type="text" placeholder="Paste YouTube URL">
+      </div>
+      <div class="row" style="gap:8px;margin-top:22px">
+        <button id="addUrlBtn2" class="btn-small" title="Add URL">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 11V6h2v5h5v2h-5v5h-2v-5H6v-2h5z"/></svg>
+          <span>Add</span>
+        </button>
+        <button id="exportBtn2" class="btn-small" title="Export list as JSON">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 20h14v-2H5v2zM12 2 6.5 7.5l1.4 1.4L11 5.8V16h2V5.8l3.1 3.1 1.4-1.4L12 2z"/></svg>
+          <span>Export</span>
+        </button>
+      </div>
+    </div>
+    <div class="banner" style="margin-top:8px">Same list as URL list 1, shown with thumbnails.</div>
+    <div class="list" id="list2"></div>
+  </div>
+
 </div>
 
 <div id="wm"
@@ -249,13 +273,20 @@ const S_LASTPOS='YT21_LASTPOS';
 
 const tabPlayer=document.getElementById('tabPlayer');
 const tabUrls=document.getElementById('tabUrls');
+const tabUrls2=document.getElementById('tabUrls2');
 const pagePlayer=document.getElementById('pagePlayer');
 const pageUrls=document.getElementById('pageUrls');
+const pageUrls2=document.getElementById('pageUrls2');
 function setTab(which){
-  if(which==='player'){ tabPlayer.classList.add('active'); tabUrls.classList.remove('active'); pagePlayer.classList.add('active'); pageUrls.classList.remove('active'); }
-  else { tabUrls.classList.add('active'); tabPlayer.classList.remove('active'); pageUrls.classList.add('active'); pagePlayer.classList.remove('active'); }
+  // reset active states
+  [tabPlayer, tabUrls, tabUrls2].filter(Boolean).forEach(b=>b.classList.remove('active'));
+  [pagePlayer, pageUrls, pageUrls2].filter(Boolean).forEach(p=>p.classList.remove('active'));
+  if(which==='player'){ tabPlayer.classList.add('active'); pagePlayer.classList.add('active'); }
+  else if(which==='urls2'){ tabUrls2.classList.add('active'); pageUrls2.classList.add('active'); }
+  else { tabUrls.classList.add('active'); pageUrls.classList.add('active'); }
 }
 tabPlayer.onclick=()=>setTab('player');
+if(tabUrls2) tabUrls2.onclick=()=>setTab('urls2');
 tabUrls.onclick=()=>setTab('urls');
 
 function parseVideoId(input){
@@ -328,7 +359,7 @@ async function addItemByUrl(rawUrl){
   const id = parseVideoId(rawUrl);
   if(!id){ return; }
   const title = await fetchTitleForId(id);
-  items.push({id, title});
+  items.unshift({id, title}); // add to top
   saveList();
   renderList();
 }
@@ -352,6 +383,7 @@ function updateTitle(idx, newTitle){
   saveList(); renderList(false);
 }
 function renderList(){
+  renderList2();
   const list = document.getElementById('list');
   list.innerHTML='';
   items.forEach((it, idx)=>{
@@ -482,6 +514,7 @@ timerToggle.addEventListener('change', ()=>{
   if (!timerEnabled){
     clearTimer();
     applyPink(false,false);
+    applyYellow(false);
     timerExpired = false;
   }else{
     startTimerCountdown();
@@ -510,6 +543,7 @@ function setTab(which){
 }
 tabSearch.onclick=()=>setTab('search');
 
+function applyYellow(on){ const root=document.body; root.classList.toggle('yellowify', !!on); }
 // --- Timer v39: reset button + countdown + pause on end
 const timerLeftEl = document.getElementById('timerLeft');
 const timerResetBtn = document.getElementById('timerResetBtn');
@@ -529,6 +563,7 @@ function updateTimerBadge(msLeft){
 function resetTimer(){
   timerExpired=false;
   applyPink(false,false);
+  applyYellow(false);
   if(timerEnabled){
     startTimerCountdown();
   }else{
@@ -541,12 +576,13 @@ timerResetBtn.addEventListener('click', resetTimer);
 const __orig_startTimerCountdown = startTimerCountdown;
 startTimerCountdown = function(){
   clearTimer();
-  if (!timerEnabled){ updateTimerBadge(0); return; }
+  if (!timerEnabled){ updateTimerBadge(0); applyYellow(false); return; }
   timerExpired = false;
   const mins = Math.max(1, parseInt(timerMinInput.value||'30',10));
   timerMinutes = mins;
   timerDeadline = Date.now() + mins*60*1000;
   updateTimerBadge(timerDeadline - Date.now());
+  applyYellow(false);
   timerTick = setInterval(()=>{
     const msLeft = timerDeadline - Date.now();
     if (msLeft <= 0){
@@ -555,9 +591,11 @@ startTimerCountdown = function(){
       try { pauseNow(); } catch(e) { try{ player.pauseVideo(); }catch(_){} }
       try { setPlayUIActive(false); setPauseUIActive(false); } catch(e) {}
       applyPink(true, true);
+      applyYellow(false);
       setTimeout(()=> applyPink(true, false), 10_000);
       updateTimerBadge(0);
     } else {
+      applyYellow(msLeft <= 10*60*1000);
       updateTimerBadge(msLeft);
     }
   }, 500);
@@ -643,6 +681,37 @@ async function doSearch(){
 searchBtn.addEventListener('click', doSearch);
 searchInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ doSearch(); }});
 
+
+
+function thumbUrl(id){ return 'https://img.youtube.com/vi/'+id+'/mqdefault.jpg'; }
+function renderList2(){
+  const list = document.getElementById('list2');
+  if(!list) return;
+  list.innerHTML='';
+  items.forEach((it, idx)=>{
+    const row = document.createElement('div');
+    row.className='item2';
+    const img = document.createElement('img'); img.className='thumb'; img.src=thumbUrl(it.id); img.alt=it.title||''; img.loading='lazy';
+    const title = document.createElement('input'); title.className='titleEditable'; title.value = it.title || '(untitled video)';
+    title.title = 'Edit title. Double-click to play.';
+    title.addEventListener('change', ()=> updateTitle(idx, title.value));
+    title.addEventListener('dblclick', ()=>{ let r=0; if(randToggle.checked && document.getElementById('randLastToggle').checked){ const id=items[idx]?.id; r=getLastPos(id); } loadByIndex(idx, true, r); setTab('player'); });
+    const btnPlay = document.createElement('button'); btnPlay.className='btn-icon'; btnPlay.title='Play this';
+    btnPlay.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>';
+    btnPlay.onclick=()=>{ let r=0; if(randToggle.checked && document.getElementById('randLastToggle').checked){ const id=items[idx]?.id; r=getLastPos(id); } loadByIndex(idx,true,r); setTab('player'); };
+    const btnUp = document.createElement('button'); btnUp.className='btn-icon'; btnUp.title='Move up';
+    btnUp.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.59 5.58L20 12 12 4 4 12z"/></svg>';
+    btnUp.onclick=()=>moveItem(idx,-1);
+    const btnDown = document.createElement('button'); btnDown.className='btn-icon'; btnDown.title='Move down';
+    btnDown.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l8 8 8-8-1.41-1.41L13 16.17V4h-2v12.17L5.41 10.59 4 12z"/></svg>';
+    btnDown.onclick=()=>moveItem(idx,1);
+    const btnTop = document.createElement('button'); btnTop.className='btn-icon'; btnTop.title='Move to top';
+    btnTop.textContent='â‡¡Top'; btnTop.onclick=()=>moveToTop(idx);
+    row.appendChild(img); row.appendChild(title); row.appendChild(btnPlay); row.appendChild(btnUp); row.appendChild(btnDown); row.appendChild(btnTop);
+    if(idx===currentIndex){ row.style.boxShadow='0 0 0 2px rgba(62,86,168,.5) inset'; }
+    list.appendChild(row);
+  });
+}
 
 // Per-video last paused positions
 function loadPosMap(){
@@ -854,6 +923,7 @@ async function startPlayStepper(){
   // v38 reset timer/pink at start of a new cycle
   if (timerEnabled){ startTimerCountdown(); }
   if (timerExpired){ applyPink(false,false); timerExpired=false; }
+  applyYellow(false);
 
   if(!player){ return; }
   if(bypassToggle.checked){
@@ -963,6 +1033,14 @@ document.getElementById('importBtn').addEventListener('click', ()=> document.get
 document.getElementById('fetchTitlesBtn').addEventListener('click', (e)=>{
   const all = e.shiftKey === true; fetchTitlesForList(!all);
 });
+
+// URL list 2 controls
+const urlInput2 = document.getElementById('urlInput2');
+const addUrlBtn2 = document.getElementById('addUrlBtn2');
+const exportBtn2 = document.getElementById('exportBtn2');
+if(addUrlBtn2){ addUrlBtn2.addEventListener('click', async()=>{ const raw=(urlInput2.value||'').trim(); if(!raw) return; await addItemByUrl(raw); urlInput2.value=''; if(currentIndex===-1 && items.length>0){ loadByIndex(0,false); } }); }
+if(exportBtn2){ exportBtn2.addEventListener('click', exportJSON); }
+
 document.getElementById('importFile').addEventListener('change', (e)=>{
   const f=e.target.files && e.target.files[0];
   if(f) importJSONFile(f);
