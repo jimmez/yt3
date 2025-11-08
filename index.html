@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>YT play/pause - v43</title>
+<title>YT play/pause - v40</title>
 <style>
   :root {
     --bg:#0b0b0c; --fg:#f5f7fa; --muted:#a4acb6; --card:#15161a;
@@ -73,7 +73,6 @@
   .btn-small svg{width:18px;height:18px}
   
   /* Timer-expired styling */
-  .yellowify * { color:#ffd24d !important; }
   .pinkify * { color:#ff3aa8 !important; }
   @keyframes v38blink { 0%, 100% { opacity:1 } 50% { opacity:.25 } }
   .blink { animation: v38blink .8s step-start infinite; }
@@ -103,11 +102,11 @@
   <div class="tabs">
     <button id="tabPlayer" class="btn-tab active">Player</button>
     <button id="tabUrls" class="btn-tab">URL list=</button>
-    
+    <button id="tabSearch" class="btn-tab">Search</button>
   </div>
 
   <div class="card page active" id="pagePlayer">
-    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause - v43</h1>
+    <h1 style="font-size:20px;margin:0 0 8px;color:#e2e8f0">YT play/pause - v40</h1>
     <div class="playerWrap" id="playerWrap">
       <div id="player"></div>
       <div id="pauseCoverPlayer" class="pauseCoverPlayer" aria-hidden="true"></div>
@@ -216,6 +215,14 @@
     <div class="banner" style="margin-top:8px">Unlimited items. Titles auto-fetched; click a title to edit. Use â†‘ â†“ or â‡¡Top to reorder. Double-click title to play.</div>
     <div class="list" id="list"></div>
   </div>
+
+  <div class="card page" id="pageSearch">
+    <h2>Search YouTube</h2>
+    <div class="searchWrap">
+      <input id="searchInput" type="text" placeholder="Type to search...">
+      <button id="searchBtn">Search</button>
+      <span id="searchStatus" class="badge" style="display:none"></span>
+    </div>
     <div class="results" id="searchResults"></div>
     <div class="banner" style="margin-top:10px">Tip: Click a result to <b>Add & Play</b>. Uses a public API â€“ if results are empty, try again or different keywords.</div>
   </div>
@@ -475,7 +482,6 @@ timerToggle.addEventListener('change', ()=>{
   if (!timerEnabled){
     clearTimer();
     applyPink(false,false);
-    applyYellow(false);
     timerExpired = false;
   }else{
     startTimerCountdown();
@@ -493,6 +499,16 @@ timerMinInput.addEventListener('input', ()=>{
 
 
 
+
+// --- Tabs: include Search
+const tabSearch=document.getElementById('tabSearch');
+const pageSearch=document.getElementById('pageSearch');
+function setTab(which){
+  if(which==='player'){ tabPlayer.classList.add('active'); tabUrls.classList.remove('active'); tabSearch.classList.remove('active'); pagePlayer.classList.add('active'); pageUrls.classList.remove('active'); pageSearch.classList.remove('active'); }
+  else if(which==='urls'){ tabUrls.classList.add('active'); tabPlayer.classList.remove('active'); tabSearch.classList.remove('active'); pageUrls.classList.add('active'); pagePlayer.classList.remove('active'); pageSearch.classList.remove('active'); }
+  else { tabSearch.classList.add('active'); tabPlayer.classList.remove('active'); tabUrls.classList.remove('active'); pageSearch.classList.add('active'); pagePlayer.classList.remove('active'); pageUrls.classList.remove('active'); }
+}
+tabSearch.onclick=()=>setTab('search');
 
 // --- Timer v39: reset button + countdown + pause on end
 const timerLeftEl = document.getElementById('timerLeft');
@@ -513,7 +529,6 @@ function updateTimerBadge(msLeft){
 function resetTimer(){
   timerExpired=false;
   applyPink(false,false);
-  applyYellow(false);
   if(timerEnabled){
     startTimerCountdown();
   }else{
@@ -539,12 +554,10 @@ startTimerCountdown = function(){
       timerExpired = true;
       try { pauseNow(); } catch(e) { try{ player.pauseVideo(); }catch(_){} }
       try { setPlayUIActive(false); setPauseUIActive(false); } catch(e) {}
-      applyYellow(false);
       applyPink(true, true);
       setTimeout(()=> applyPink(true, false), 10_000);
       updateTimerBadge(0);
     } else {
-      applyYellow(msLeft <= 10*60*1000);
       updateTimerBadge(msLeft);
     }
   }, 500);
@@ -841,7 +854,6 @@ async function startPlayStepper(){
   // v38 reset timer/pink at start of a new cycle
   if (timerEnabled){ startTimerCountdown(); }
   if (timerExpired){ applyPink(false,false); timerExpired=false; }
-  applyYellow(false);
 
   if(!player){ return; }
   if(bypassToggle.checked){
